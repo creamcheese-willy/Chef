@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F4EC">
+<title>Dinner — two plates, no leftovers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,50..100&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F2F4EC; --card:#FFFFFF; --ink:#262E20; --ink-soft:#5F6852;
+  --beet:#7A2E4D; --beet-soft:#F3E6EC; --marigold:#E9A13B; --marigold-soft:#FBF0DC;
+  --herb:#567A3A; --herb-soft:#EAF1E2; --line:#DDE2D0;
+  --fish:#3E6E8E; --chicken:#A9762B; --veg:#567A3A; --beef:#8A4A3A; --pork:#B06A6A;
+  --radius:16px; --nav-h:64px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.45; padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));
+}
+h1,h2,h3,.display{font-family:"Fraunces",Georgia,serif; font-variation-settings:"SOFT" 80; letter-spacing:-0.01em}
+button{font:inherit; color:inherit; border:0; background:none; cursor:pointer}
+input,textarea,select{font:inherit; color:var(--ink)}
+.wrap{max-width:560px; margin:0 auto; padding:0 14px}
+
+/* Header */
+header{padding:18px 0 6px}
+header .kicker{font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft)}
+header h1{margin:.1rem 0 0; font-size:1.7rem; font-weight:600}
+
+/* Bottom nav */
+nav.tabs{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);
+  display:flex; height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav.tabs button{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.68rem; color:var(--ink-soft)}
+nav.tabs button .ic{font-size:1.25rem; line-height:1}
+nav.tabs button.active{color:var(--beet); font-weight:600}
+
+/* Sections */
+.screen{display:none; padding-top:2px}
+.screen.active{display:block}
+.section-note{color:var(--ink-soft); font-size:.86rem; margin:2px 0 12px}
+
+/* Week groups + meal tickets */
+.week-label{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:18px 2px 8px; display:flex; justify-content:space-between; align-items:baseline}
+.week-label .range{letter-spacing:0; text-transform:none; font-size:.78rem}
+.ticket{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 14px; margin-bottom:10px; display:flex; gap:12px; align-items:center;
+  box-shadow:0 1px 2px rgba(38,46,32,.05);
+}
+.ticket .datebox{min-width:46px; text-align:center}
+.ticket .dow{font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft)}
+.ticket .dom{font-family:"Fraunces",serif; font-size:1.35rem; font-weight:600; line-height:1.1}
+.ticket .body{flex:1; min-width:0}
+.ticket .title{font-weight:600; font-size:.98rem}
+.ticket .sub{font-size:.8rem; color:var(--ink-soft); margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.ticket .chev{color:var(--ink-soft)}
+.ticket.cooked{opacity:.55}
+.ticket.cooked .title{text-decoration:line-through}
+.tagrow{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap}
+.tag{font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; padding:2px 8px; border-radius:999px; color:#fff}
+.tag.fish{background:var(--fish)} .tag.chicken{background:var(--chicken)}
+.tag.veg{background:var(--veg)} .tag.beef{background:var(--beef)} .tag.pork{background:var(--pork)}
+.tag.peak{background:var(--marigold-soft); color:#8a5a10; border:1px solid var(--marigold)}
+.tag.surplus{background:var(--beet-soft); color:var(--beet); border:1px solid var(--beet)}
+.tag.frozen{background:#E8F0F4; color:var(--fish); border:1px solid var(--fish)}
+
+/* Buttons */
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; padding:12px 16px; font-weight:600; font-size:.95rem}
+.btn.primary{background:var(--beet); color:#fff}
+.btn.ghost{background:var(--card); border:1px solid var(--line)}
+.btn.small{padding:8px 12px; font-size:.84rem; border-radius:10px}
+.btn.full{width:100%}
+.btn:disabled{opacity:.5}
+.btn-row{display:flex; gap:8px; flex-wrap:wrap}
+
+/* Recipe view */
+.recipe-hero{padding:6px 0 4px}
+.recipe-hero h2{font-size:1.55rem; margin:.2rem 0; font-weight:600; line-height:1.2}
+.recipe-hero .desc{color:var(--ink-soft); font-size:.92rem}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin:12px 0}
+.card h3{margin:0 0 8px; font-size:1.02rem}
+.ing{display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:.95rem}
+.ing:last-child{border-bottom:0}
+.ing input{width:20px; height:20px; margin-top:1px; accent-color:var(--herb)}
+.ing .amt{font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap}
+.ing.checked{opacity:.45; text-decoration:line-through}
+.step{padding:12px 0; border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step .n{display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--beet-soft); color:var(--beet); font-weight:700; font-size:.8rem; align-items:center; justify-content:center; margin-right:8px}
+.step .st{font-weight:600}
+.step .sc{margin:4px 0 0 32px; font-size:.93rem; color:#3a4232}
+.notes{background:var(--marigold-soft); border:1px solid var(--marigold); border-radius:12px; padding:10px 12px; font-size:.88rem; margin:12px 0}
+.back{color:var(--beet); font-weight:600; padding:10px 0; display:inline-flex; gap:6px; align-items:center}
+.scaler{display:flex; gap:6px; align-items:center; font-size:.85rem}
+.scaler button{border:1px solid var(--line); background:var(--card); border-radius:8px; padding:5px 10px; font-weight:600}
+.scaler button.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+
+/* Cooking mode */
+#cookmode{position:fixed; inset:0; background:var(--ink); color:#F4F6EE; z-index:100; display:none; flex-direction:column; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#cookmode.open{display:flex}
+#cookmode .cm-top{display:flex; justify-content:space-between; align-items:center; padding:14px 18px}
+#cookmode .cm-title{font-size:.85rem; opacity:.75; max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#cookmode .cm-close{color:#F4F6EE; font-size:1rem; font-weight:600; padding:8px 10px; border:1px solid rgba(255,255,255,.3); border-radius:10px}
+#cookmode .cm-main{flex:1; overflow:auto; padding:8px 22px 20px}
+#cookmode .cm-stepn{font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--marigold)}
+#cookmode .cm-steptitle{font-family:"Fraunces",serif; font-size:1.9rem; font-weight:600; margin:.3rem 0 .6rem; line-height:1.15}
+#cookmode .cm-steptext{font-size:1.25rem; line-height:1.5}
+#cookmode .cm-timer{margin-top:20px; text-align:center}
+#cookmode .cm-clock{font-variant-numeric:tabular-nums; font-family:"Fraunces",serif; font-size:3.4rem; font-weight:600}
+#cookmode .cm-clock.done{color:var(--marigold); animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.4}}
+#cookmode .cm-bot{display:flex; gap:10px; padding:12px 18px 18px}
+#cookmode .cm-bot .btn{flex:1; padding:16px; font-size:1.05rem}
+#cookmode .btn.dark{background:rgba(255,255,255,.12); color:#fff}
+#cookmode .btn.gold{background:var(--marigold); color:#3a2a08}
+#cookmode .cm-ings{font-size:1.02rem; opacity:.9; margin-top:14px; border-top:1px solid rgba(255,255,255,.2); padding-top:10px}
+#cookmode .cm-ings b{color:var(--marigold)}
+
+/* Grocery */
+.gweek{display:flex; gap:8px; margin:4px 0 14px}
+.gweek button{flex:1; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:9px 4px; font-size:.8rem; font-weight:600; color:var(--ink-soft)}
+.gweek button.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+.gcat{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin:16px 2px 6px}
+.gitem{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:.93rem}
+.gitem input{width:20px;height:20px;margin-top:1px;accent-color:var(--herb)}
+.gitem.done{opacity:.45}
+.gitem.done .gname{text-decoration:line-through}
+.gitem .gfor{display:block; font-size:.74rem; color:var(--ink-soft)}
+
+/* Ingredients screen */
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0}
+.chip{border:1px solid var(--line); background:var(--card); border-radius:999px; padding:8px 14px; font-size:.88rem; font-weight:500; display:inline-flex; gap:6px; align-items:center}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--marigold)}
+.chip.on{background:var(--beet); border-color:var(--beet); color:#fff}
+.chip.on .dot{background:var(--marigold)}
+.surp{display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px}
+.surp .sx{color:var(--beet); font-weight:700; padding:4px 8px}
+.addrow{display:flex; gap:8px; margin-top:10px}
+.addrow input{flex:1; border:1px solid var(--line); border-radius:10px; padding:11px 12px; background:var(--card)}
+
+/* Chef sheet + modals */
+.fab{position:fixed; right:16px; bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px); z-index:39;
+  background:var(--beet); color:#fff; border-radius:999px; padding:13px 18px; font-weight:700; font-size:.92rem;
+  box-shadow:0 6px 18px rgba(122,46,77,.35); display:none; align-items:center; gap:8px}
+.fab.show{display:inline-flex}
+.sheet-mask{position:fixed; inset:0; background:rgba(20,24,16,.45); z-index:60; display:none}
+.sheet-mask.open{display:block}
+.sheet{position:fixed; left:0; right:0; bottom:0; z-index:61; background:var(--card);
+  border-radius:20px 20px 0 0; padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  transform:translateY(105%); transition:transform .22s ease; max-height:86vh; overflow:auto}
+.sheet.open{transform:none}
+.sheet h3{margin:2px 0 4px; font-size:1.15rem}
+.sheet .hint{font-size:.84rem; color:var(--ink-soft); margin-bottom:10px}
+.sheet textarea{width:100%; min-height:88px; border:1px solid var(--line); border-radius:12px; padding:11px 12px; resize:vertical; background:#FCFCFA}
+.quick{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 12px}
+.quick button{border:1px solid var(--line); border-radius:999px; padding:7px 12px; font-size:.82rem; background:#FCFCFA}
+.quick button.on{background:var(--beet-soft); border-color:var(--beet); color:var(--beet); font-weight:600}
+.chef-reply{background:var(--herb-soft); border:1px solid var(--herb); border-radius:12px; padding:10px 12px; font-size:.88rem; margin-top:10px}
+.spin{display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.err{background:#FBE9E7; border:1px solid #C6564A; color:#7C2D24; border-radius:12px; padding:10px 12px; font-size:.86rem; margin-top:10px}
+
+/* Settings */
+.set-block label{display:block; font-weight:600; font-size:.9rem; margin-bottom:6px}
+.set-block input{width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; background:var(--card)}
+.prefs li{font-size:.88rem; margin-bottom:6px}
+.muted{color:var(--ink-soft); font-size:.82rem}
+@media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Two plates · no leftovers</div>
+    <h1 id="hdr">This week's dinners</h1>
+  </header>
+
+  <!-- PLAN -->
+  <section id="scr-plan" class="screen active">
+    <p class="section-note">Three weeks out. Tap a meal for the recipe; use <b>Adjust</b> on any meal — or the <b>Chef</b> button — to change direction on the spot.</p>
+    <div id="plan-list"></div>
+  </section>
+
+  <!-- RECIPE -->
+  <section id="scr-recipe" class="screen">
+    <button class="back" onclick="showTab('plan')">‹ Back to plan</button>
+    <div id="recipe-body"></div>
+  </section>
+
+  <!-- GROCERIES -->
+  <section id="scr-grocery" class="screen">
+    <p class="section-note">Built from each week's planned meals, combined across recipes. Staples are listed last — check the pantry before buying.</p>
+    <div class="gweek" id="gweek-tabs"></div>
+    <div class="btn-row" style="margin-bottom:10px">
+      <button class="btn ghost small" onclick="copyGroceries()">Copy list</button>
+      <button class="btn ghost small" onclick="resetGroceryChecks()">Clear checks</button>
+    </div>
+    <div id="grocery-list"></div>
+  </section>
+
+  <!-- INGREDIENTS -->
+  <section id="scr-ingredients" class="screen">
+    <h2 class="display" style="font-size:1.25rem; margin:4px 0 2px">In season now</h2>
+    <p class="section-note">What's good near you this month. <span style="color:#8a5a10">●</span> marks peak. Tap to feature an ingredient — the chef will lean on it for upcoming meals.</p>
+    <div class="chips" id="season-chips"></div>
+    <h2 class="display" style="font-size:1.25rem; margin:20px 0 2px">We have a bunch of…</h2>
+    <p class="section-note">Things at home you'd like used up. These get priority in new suggestions.</p>
+    <div id="surplus-list"></div>
+    <div class="addrow">
+      <input id="surp-in" placeholder="e.g. half a bag of spinach" enterkeyhint="done">
+      <button class="btn primary small" onclick="addSurplus()">Add</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="scr-settings" class="screen">
+    <div class="card set-block">
+      <label for="apikey">Anthropic API key</label>
+      <input id="apikey" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <p class="muted" style="margin:8px 0 10px">Powers in-app feedback and meal swaps. Stored only on this device, sent only to Anthropic. Get one at console.anthropic.com.</p>
+      <button class="btn primary small" onclick="saveKey()">Save key</button> <span id="key-status" class="muted"></span>
+    </div>
+    <div class="card set-block">
+      <h3 style="margin-top:0">The chef's standing notes</h3>
+      <p class="muted">Learned from your feedback; applied to every new suggestion.</p>
+      <ul class="prefs" id="prefs-list"></ul>
+    </div>
+    <div class="card set-block">
+      <h3 style="margin-top:0">House rules (built in)</h3>
+      <ul class="prefs">
+        <li>Two adults, four dinners a week, sized to avoid leftovers.</li>
+        <li>Shopping happens Sunday: fish first, then chicken, then other meats (frozen early, thawed midweek).</li>
+        <li>One hearty vegetarian meal most weeks — chickpeas, sweet potatoes, beans.</li>
+        <li>Share perishables across the week: a bunch of scallions, one herb bunch, limes, etc.</li>
+        <li>Health-conscious but delicious-first.</li>
+      </ul>
+    </div>
+    <div class="card set-block">
+      <button class="btn ghost small" onclick="hardReset()">Reset app data</button>
+      <p class="muted" style="margin-top:8px">Clears plans, checks, features and surplus on this device.</p>
+    </div>
+  </section>
+</div>
+
+<button class="fab show" id="chef-fab" onclick="openChef()">👩‍🍳 Chef</button>
+
+<nav class="tabs">
+  <button id="tab-plan" class="active" onclick="showTab('plan')"><span class="ic">🗓️</span>Plan</button>
+  <button id="tab-grocery" onclick="showTab('grocery')"><span class="ic">🧺</span>Groceries</button>
+  <button id="tab-ingredients" onclick="showTab('ingredients')"><span class="ic">🌽</span>Ingredients</button>
+  <button id="tab-settings" onclick="showTab('settings')"><span class="ic">⚙️</span>Settings</button>
+</nav>
+
+<!-- Chef / feedback sheet -->
+<div class="sheet-mask" id="sheet-mask" onclick="closeChef()"></div>
+<div class="sheet" id="chef-sheet">
+  <h3 id="chef-title">Direct the chef</h3>
+  <p class="hint" id="chef-hint">Tell it anything — swap a meal, ban an ingredient, ask for lighter weeks.</p>
+  <div class="quick" id="chef-quick"></div>
+  <textarea id="chef-text" placeholder="e.g. Tuesday doesn't sound good — something with the peaches we have?"></textarea>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="btn primary full" id="chef-send" onclick="sendChef()">Send to chef</button>
+  </div>
+  <div id="chef-out"></div>
+</div>
+
+<!-- Cooking mode -->
+<div id="cookmode">
+  <div class="cm-top">
+    <div class="cm-title" id="cm-title"></div>
+    <button class="cm-close" onclick="closeCook()">Done</button>
+  </div>
+  <div class="cm-main" id="cm-main"></div>
+  <div class="cm-bot">
+    <button class="btn dark" id="cm-prev" onclick="cookNav(-1)">‹ Back</button>
+    <button class="btn gold" id="cm-next" onclick="cookNav(1)">Next ›</button>
+  </div>
+</div>
+
+<script>
+/* ====================== DATA LAYER ====================== */
+const LS_KEY = 'dinner-app-v1';
+function I(amount, unit, name, cat, staple){ return {amount, unit, name, cat, staple: !!staple}; }
+function S(title, content, timerSeconds){ return {title, content, timerSeconds: timerSeconds||null}; }
+
+const SEED_RECIPES = {
+ 'shrimp-sheetpan': { title:'Sheet-Pan Lemon Garlic Shrimp with Zucchini & Corn', tag:'fish',
+  desc:'A fast, bright one-pan dinner — minimal cleanup, big flavor.',
+  ingredients:[ I(1,'lb','large shrimp, peeled & deveined','protein'), I(2,'','zucchini, sliced into half-moons','produce'),
+   I(2,'','ears of corn, kernels cut off','produce'), I(3,'','garlic cloves, minced','produce'),
+   I(1,'','lemon, zested and juiced','produce'), I(2,'tbsp','olive oil','pantry',true),
+   I(0.25,'tsp','red pepper flakes','pantry',true), I(2,'','scallions, thinly sliced','produce'),
+   I(0.5,'tsp','salt','pantry',true), I(0.25,'tsp','black pepper','pantry',true), I(0.25,'cup','grated parmesan (optional)','pantry') ],
+  steps:[ S('Preheat & prep','Preheat oven to 425°F and line a sheet pan with foil or parchment.'),
+   S('Roast the veg','Toss zucchini and corn with half the oil, half the salt, and pepper on the pan. Single layer; roast.',480),
+   S('Season shrimp','Toss shrimp with remaining oil, garlic, lemon zest, pepper flakes, and remaining salt.'),
+   S('Roast shrimp','Push veg aside, add shrimp in a single layer, roast until pink and opaque.',420),
+   S('Finish & serve','Squeeze lemon juice over everything. Top with scallions and parmesan. Serve off the pan.') ],
+  notes:'No fresh shrimp? Frozen (thawed) works great and is often cheaper.' },
+
+ 'ginger-chicken': { title:'Ginger-Scallion Chicken Thighs with Rice', tag:'chicken',
+  desc:'Pan-seared, glazed in a sweet-savory soy sauce — a weeknight staple.',
+  ingredients:[ I(1.25,'lb','boneless skinless chicken thighs','protein'), I(1,'cup','jasmine rice, dry','pantry',true),
+   I(4,'','scallions, thinly sliced, divided','produce'), I(1,'tbsp','fresh ginger, grated','produce'),
+   I(3,'','garlic cloves, minced','produce'), I(3,'tbsp','soy sauce','pantry',true), I(1,'tbsp','rice vinegar','pantry',true),
+   I(1,'tbsp','honey','pantry',true), I(1,'tbsp','sesame oil','pantry',true), I(1,'tbsp','neutral oil, for searing','pantry',true),
+   I(1,'tsp','sesame seeds (optional)','pantry',true) ],
+  steps:[ S('Start the rice','Rice + 2 cups water in a pot. Boil, cover, simmer on low until absorbed.',1080),
+   S('Mix the sauce','Whisk soy, vinegar, honey, sesame oil, ginger, and garlic. Set aside.'),
+   S('Sear the chicken','Pat thighs dry, season with salt and pepper. Sear in neutral oil over medium-high, undisturbed, until deeply browned.',300),
+   S('Flip & finish','Flip and cook until internal temp hits 165°F.',300),
+   S('Glaze','Pour in the sauce, let it bubble and thicken, turning to coat. Stir in half the scallions.',120),
+   S('Serve','Slice over rice, spoon pan sauce on top, garnish with remaining scallions and sesame seeds.') ], notes:'' },
+
+ 'chickpea-bowls': { title:'Crispy Chickpea & Sweet Potato Bowls with Lime-Ginger Tahini', tag:'veg',
+  desc:'Crispy roasted sweet potato and chickpeas over rice, bright tahini drizzle. Very filling, ~20g protein per serving.',
+  ingredients:[ I(2,'','sweet potatoes, cubed','produce'), I(1,'','can (15 oz) chickpeas, drained & patted dry','protein'),
+   I(2,'tbsp','olive oil, divided','pantry',true), I(1,'tsp','ground cumin','pantry',true), I(1,'tsp','smoked paprika','pantry',true),
+   I(0.5,'tsp','salt, divided','pantry',true), I(1,'cup','jasmine rice, dry','pantry',true), I(2,'cup','baby spinach','produce'),
+   I(2,'','scallions, thinly sliced','produce'), I(0.25,'cup','cilantro, chopped','produce'), I(1,'','lime, juiced','produce'),
+   I(3,'tbsp','tahini','pantry',true), I(1,'tsp','fresh ginger, grated','produce'), I(0.25,'cup','pepitas or toasted nuts (optional)','pantry') ],
+  steps:[ S('Season sweet potatoes','Preheat oven to 425°F. Toss sweet potatoes with 1 tbsp oil, cumin, paprika, half the salt on a sheet pan.'),
+   S('Roast (first round)','Roast until starting to brown.',900),
+   S('Add chickpeas & finish','Toss chickpeas with remaining oil and salt; add to pan, roast until both are crispy and golden.',900),
+   S('Cook the rice','Rice + 2 cups water: boil, cover, simmer low until absorbed.',1080),
+   S('Make the dressing','Whisk tahini, lime juice, ginger, and ~3 tbsp water until pourable.'),
+   S('Assemble','Rice, spinach, roasted veg. Top with scallions, cilantro, dressing, pepitas.') ],
+  notes:'Great make-ahead — roasted veg and dressing hold well in the fridge a couple days.' },
+
+ 'beef-tacos': { title:'Weeknight Beef Tacos with Lime-Cabbage Slaw', tag:'beef', frozen:true,
+  desc:'Crunchy, bright slaw balances rich, well-seasoned beef.',
+  ingredients:[ I(1,'lb','ground beef','protein'), I(1,'tbsp','chili powder','pantry',true), I(1,'tsp','ground cumin','pantry',true),
+   I(1,'tsp','smoked paprika','pantry',true), I(0.5,'tsp','garlic powder','pantry',true), I(0.75,'tsp','salt, divided','pantry',true),
+   I(8,'','small corn tortillas','pantry'), I(2,'cup','shredded coleslaw mix (cabbage & carrot)','produce'),
+   I(2,'','limes, juiced, divided','produce'), I(0.25,'cup','cilantro, chopped','produce'),
+   I(2,'','scallions, thinly sliced','produce'), I(0.33,'cup','sour cream or Mexican crema','pantry') ],
+  steps:[ S('Make the slaw','Toss slaw mix with half the lime juice, cilantro, scallions, pinch of salt. Set aside to marinate.'),
+   S('Brown the beef','Cook beef over medium-high, breaking it up, until no longer pink. Drain excess fat.',420),
+   S('Season','Add spices, remaining salt, and 3 tbsp water. Simmer until thickened.',120),
+   S('Warm tortillas','Dry skillet or open flame, a few seconds per side.'),
+   S('Assemble','Beef, slaw, crema. Finish with remaining lime.') ],
+  notes:'Shopping Sunday, cooking Saturday: freeze the beef on day one, move it to the fridge Wednesday night.' },
+
+ 'salmon-corn': { title:'Pan-Seared Salmon with Charred Corn & Tomato Sauté', tag:'fish',
+  desc:'Crisp-skinned salmon over August corn and burst cherry tomatoes.',
+  ingredients:[ I(2,'','salmon fillets (6 oz each)','protein'), I(2,'','ears of corn, kernels cut off','produce'),
+   I(1,'pint','cherry tomatoes','produce'), I(2,'','garlic cloves, sliced','produce'), I(2,'','scallions, thinly sliced','produce'),
+   I(2,'tbsp','olive oil, divided','pantry',true), I(1,'','lemon','produce'), I(0.75,'tsp','salt, divided','pantry',true),
+   I(0.25,'tsp','black pepper','pantry',true), I(0.25,'cup','basil leaves, torn','produce') ],
+  steps:[ S('Sear the salmon','Pat fillets very dry; season. Sear skin-side down in 1 tbsp oil over medium-high until skin releases and crisps.',360),
+   S('Finish the fish','Flip, cook 1–2 min to medium. Rest on a plate.',120),
+   S('Char the corn','Same pan: remaining oil, corn, pinch of salt. Cook undisturbed until spotty brown.',240),
+   S('Burst the tomatoes','Add tomatoes and garlic; cook until tomatoes blister and split.',240),
+   S('Serve','Stir in scallions and a big squeeze of lemon. Plate under the salmon; shower with basil.') ],
+  notes:'Cook this the day you shop — salmon rewards freshness.' },
+
+ 'fajita-bowls': { title:'Chicken Fajita Bowls with Peppers & Lime Crema', tag:'chicken',
+  desc:'Smoky skillet chicken and peak-season peppers over rice.',
+  ingredients:[ I(1.25,'lb','boneless skinless chicken thighs, sliced','protein'), I(2,'','bell peppers, sliced','produce'),
+   I(1,'','red onion, sliced','produce'), I(1,'tbsp','chili powder','pantry',true), I(1,'tsp','ground cumin','pantry',true),
+   I(1,'tsp','smoked paprika','pantry',true), I(0.75,'tsp','salt','pantry',true), I(2,'tbsp','neutral oil','pantry',true),
+   I(1,'cup','jasmine rice, dry','pantry',true), I(1,'','lime','produce'), I(0.33,'cup','sour cream','pantry'),
+   I(0.25,'cup','cilantro, chopped','produce') ],
+  steps:[ S('Start the rice','Rice + 2 cups water: boil, cover, simmer low until absorbed.',1080),
+   S('Season','Toss chicken with spices and half the salt.'),
+   S('Sear chicken','High heat, 1 tbsp oil, chicken in one layer. Brown hard, then stir until cooked through. Remove.',420),
+   S('Peppers & onion','Remaining oil; cook peppers and onion with remaining salt until charred at the edges but still snappy.',300),
+   S('Lime crema','Stir half the lime juice into the sour cream.'),
+   S('Assemble','Rice, chicken, veg, crema, cilantro, rest of the lime.') ], notes:'' },
+
+ 'coconut-curry': { title:'Chickpea & Spinach Coconut Curry', tag:'veg',
+  desc:'A 25-minute pantry curry — creamy, gently spiced, very filling.',
+  ingredients:[ I(2,'','cans (15 oz) chickpeas, drained','protein'), I(1,'','can (13.5 oz) coconut milk','pantry'),
+   I(1,'','yellow onion, diced','produce'), I(3,'','garlic cloves, minced','produce'), I(1,'tbsp','fresh ginger, grated','produce'),
+   I(2,'tbsp','curry powder','pantry',true), I(1,'','can (14.5 oz) diced tomatoes','pantry'), I(3,'cup','baby spinach','produce'),
+   I(1,'tbsp','neutral oil','pantry',true), I(0.75,'tsp','salt','pantry',true), I(1,'cup','jasmine rice, dry','pantry',true),
+   I(1,'','lime','produce'), I(0.25,'cup','cilantro, chopped','produce') ],
+  steps:[ S('Start the rice','Rice + 2 cups water: boil, cover, simmer low until absorbed.',1080),
+   S('Soften the onion','Oil over medium; onion with a pinch of salt until translucent.',300),
+   S('Bloom the spices','Garlic, ginger, curry powder; stir until fragrant, about 1 minute.',60),
+   S('Simmer','Tomatoes, coconut milk, chickpeas, salt. Simmer to thicken slightly.',600),
+   S('Wilt & finish','Stir in spinach until wilted, then lime juice. Serve over rice with cilantro.') ],
+  notes:'Everything but the spinach is shelf-stable — a good end-of-week keeper.' },
+
+ 'beef-broccoli': { title:'Beef & Broccoli Stir-Fry', tag:'beef', frozen:true,
+  desc:'Takeout classic: glossy sauce, crisp broccoli, tender beef.',
+  ingredients:[ I(1,'lb','flank or sirloin steak, thinly sliced','protein'), I(1,'','large head broccoli, cut into florets','produce'),
+   I(3,'','garlic cloves, minced','produce'), I(1,'tbsp','fresh ginger, grated','produce'), I(3,'','scallions, cut in 1-inch pieces','produce'),
+   I(0.25,'cup','soy sauce','pantry',true), I(1,'tbsp','honey','pantry',true), I(1,'tbsp','rice vinegar','pantry',true),
+   I(2,'tsp','cornstarch','pantry',true), I(2,'tbsp','neutral oil, divided','pantry',true), I(1,'tsp','sesame oil','pantry',true),
+   I(1,'cup','jasmine rice, dry','pantry',true) ],
+  steps:[ S('Start the rice','Rice + 2 cups water: boil, cover, simmer low until absorbed.',1080),
+   S('Mix the sauce','Whisk soy, honey, vinegar, cornstarch, and ¼ cup water.'),
+   S('Flash the broccoli','1 tbsp oil, high heat; stir-fry broccoli with a splash of water until bright and crisp-tender. Remove.',240),
+   S('Sear the beef','Remaining oil, beef in one layer; sear hard, then toss with garlic and ginger.',180),
+   S('Sauce it','Return broccoli; pour in sauce and toss until glossy and thick. Finish with scallions and sesame oil.',120),
+   S('Serve','Pile over rice.') ],
+  notes:'Freeze the steak Sunday; fridge-thaw from Wednesday night. Slicing is easiest while still half-frozen.' },
+
+ 'fish-tacos': { title:'Crispy Fish Tacos with Cabbage Slaw', tag:'fish',
+  desc:'Golden pan-fried cod, cool crunchy slaw, lime everywhere.',
+  ingredients:[ I(1,'lb','cod or other flaky white fish','protein'), I(0.5,'cup','flour','pantry',true),
+   I(1,'tsp','chili powder','pantry',true), I(0.5,'tsp','ground cumin','pantry',true), I(0.75,'tsp','salt, divided','pantry',true),
+   I(8,'','small corn tortillas','pantry'), I(2,'cup','shredded coleslaw mix','produce'), I(2,'','limes, divided','produce'),
+   I(0.25,'cup','cilantro, chopped','produce'), I(0.33,'cup','sour cream','pantry'), I(3,'tbsp','neutral oil','pantry',true) ],
+  steps:[ S('Make the slaw','Slaw mix + juice of 1 lime + cilantro + pinch of salt. Toss and set aside.'),
+   S('Dredge the fish','Cut fish into strips. Mix flour, chili powder, cumin, salt; coat the fish.'),
+   S('Fry','Oil over medium-high; fry fish until golden and crisp, 2–3 min per side.',300),
+   S('Lime crema','Stir juice of ½ lime into sour cream.'),
+   S('Assemble','Warm tortillas; fill with fish, slaw, crema, extra lime.') ],
+  notes:'Sunday fish night — cod is at its best the day you buy it.' },
+
+ 'lemon-chicken-orzo': { title:'Lemon-Herb Chicken with Zucchini Orzo', tag:'chicken',
+  desc:'One skillet: golden chicken over creamy, lemony orzo with late-summer zucchini.',
+  ingredients:[ I(1.25,'lb','boneless skinless chicken thighs','protein'), I(1,'cup','orzo, dry','pantry'),
+   I(2,'','zucchini, diced','produce'), I(3,'','garlic cloves, minced','produce'), I(1,'','lemon, zested and juiced','produce'),
+   I(2.25,'cup','chicken broth','pantry'), I(2,'tbsp','olive oil','pantry',true), I(0.75,'tsp','salt, divided','pantry',true),
+   I(0.25,'cup','grated parmesan','pantry'), I(0.25,'cup','basil or parsley, chopped','produce') ],
+  steps:[ S('Brown the chicken','Season thighs; sear in oil until deeply golden both sides (not cooked through). Remove.',480),
+   S('Toast the orzo','Same pan: garlic and orzo, stirring, 1 minute.',60),
+   S('Simmer','Add broth, zucchini, remaining salt, lemon zest. Nestle chicken on top; cover and simmer until orzo is tender and chicken hits 165°F.',720),
+   S('Finish','Off heat: lemon juice, parmesan, herbs. Rest 2 minutes — the orzo turns creamy.',120) ], notes:'' },
+
+ 'loaded-sweetpot': { title:'Loaded Sweet Potatoes with Smoky Chickpeas', tag:'veg',
+  desc:'Roasted-until-caramel sweet potatoes piled with crispy BBQ-spiced chickpeas and cool slaw.',
+  ingredients:[ I(2,'','large sweet potatoes','produce'), I(1,'','can (15 oz) chickpeas, drained & patted dry','protein'),
+   I(1,'tbsp','olive oil','pantry',true), I(1,'tsp','smoked paprika','pantry',true), I(0.5,'tsp','garlic powder','pantry',true),
+   I(0.5,'tsp','salt','pantry',true), I(1,'cup','shredded coleslaw mix','produce'), I(1,'','lime','produce'),
+   I(0.33,'cup','sour cream or Greek yogurt','pantry'), I(0.25,'cup','cilantro, chopped','produce'), I(2,'','scallions, sliced','produce') ],
+  steps:[ S('Roast the potatoes','425°F. Halve sweet potatoes lengthwise, rub with a little oil, roast cut-side down until deeply tender.',2100),
+   S('Crisp the chickpeas','Toss chickpeas with oil, paprika, garlic powder, salt on a second pan; roast alongside until crackly.',1500),
+   S('Quick slaw','Toss slaw mix with half the lime juice and a pinch of salt.'),
+   S('Lime cream','Stir remaining lime juice into the sour cream.'),
+   S('Assemble','Rough up the potato flesh with a fork; pile on chickpeas, slaw, lime cream, cilantro, scallions.') ], notes:'' },
+
+ 'pork-sheetpan': { title:'Sheet-Pan Pork Tenderloin with Apples & Green Beans', tag:'pork', frozen:true,
+  desc:'First-of-September apples roasted alongside juicy pork and blistered green beans.',
+  ingredients:[ I(1.25,'lb','pork tenderloin','protein'), I(2,'','apples, cut in wedges','produce'),
+   I(0.75,'lb','green beans, trimmed','produce'), I(1,'','red onion, cut in wedges','produce'),
+   I(2,'tbsp','olive oil, divided','pantry',true), I(1,'tbsp','honey','pantry',true), I(1,'tbsp','dijon mustard','pantry'),
+   I(1,'tsp','dried thyme (or fresh)','pantry',true), I(0.75,'tsp','salt, divided','pantry',true), I(0.25,'tsp','black pepper','pantry',true) ],
+  steps:[ S('Preheat','450°F, rack in the middle. Pat the pork very dry.'),
+   S('Glaze the pork','Mix honey, dijon, thyme, half the salt; rub over the tenderloin. Set on one side of a sheet pan.'),
+   S('Add the veg','Toss apples, onion, and green beans with oil, remaining salt, pepper; spread on the other side.'),
+   S('Roast','Roast until the pork reads 140–145°F in the center.',1200),
+   S('Rest & slice','Rest pork 5 minutes (it will climb to temp), then slice thick over the pan juices.',300) ],
+  notes:'Freeze the pork Sunday; fridge-thaw from Wednesday night.' }
+};
+
+/* Northeast US seasonal produce; peak:true = at its best right now */
+const SEASONAL = {
+ 7:[ {n:'Corn',peak:1},{n:'Tomatoes',peak:1},{n:'Zucchini',peak:1},{n:'Peaches',peak:1},{n:'Bell peppers',peak:1},{n:'Eggplant',peak:1},{n:'Green beans',peak:1},{n:'Cucumbers',peak:1},{n:'Basil',peak:1},{n:'Blueberries'},{n:'Melon',peak:1},{n:'Summer squash'} ],
+ 8:[ {n:'Apples',peak:1},{n:'Tomatoes',peak:1},{n:'Corn'},{n:'Peppers',peak:1},{n:'Eggplant',peak:1},{n:'Grapes',peak:1},{n:'Pears'},{n:'Kale'},{n:'Broccoli'},{n:'Green beans'},{n:'Winter squash'},{n:'Raspberries'} ],
+ 9:[ {n:'Apples',peak:1},{n:'Pears',peak:1},{n:'Winter squash',peak:1},{n:'Pumpkins',peak:1},{n:'Kale',peak:1},{n:'Broccoli',peak:1},{n:'Cauliflower',peak:1},{n:'Brussels sprouts'},{n:'Sweet potatoes',peak:1},{n:'Cranberries'},{n:'Leeks'},{n:'Beets'} ],
+ def:[ {n:'Sweet potatoes'},{n:'Kale'},{n:'Cabbage'},{n:'Carrots'},{n:'Onions'},{n:'Apples'},{n:'Citrus'},{n:'Broccoli'} ]
+};
+
+/* Default 3-week plan starting Sun Aug 16, 2026: Sun fish → Tue chicken → Thu veg → Sat frozen-friendly */
+function defaultPlan(){
+  return [
+    {date:'2026-08-16', rid:'shrimp-sheetpan', status:'planned'},
+    {date:'2026-08-18', rid:'ginger-chicken', status:'planned'},
+    {date:'2026-08-20', rid:'chickpea-bowls', status:'planned'},
+    {date:'2026-08-22', rid:'beef-tacos', status:'planned'},
+    {date:'2026-08-23', rid:'salmon-corn', status:'planned'},
+    {date:'2026-08-25', rid:'fajita-bowls', status:'planned'},
+    {date:'2026-08-27', rid:'coconut-curry', status:'planned'},
+    {date:'2026-08-29', rid:'beef-broccoli', status:'planned'},
+    {date:'2026-08-30', rid:'fish-tacos', status:'planned'},
+    {date:'2026-09-01', rid:'lemon-chicken-orzo', status:'planned'},
+    {date:'2026-09-03', rid:'loaded-sweetpot', status:'planned'},
+    {date:'2026-09-05', rid:'pork-sheetpan', status:'planned'}
+  ];
+}
+
+let state = load();
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(LS_KEY)); if(s && s.plan) return migrate(s); }catch(e){}
+  return { plan: defaultPlan(), recipes: {}, featured: [], surplus: [], prefs: [], gchecks: {}, apiKey:'' };
+}
+function migrate(s){ s.recipes=s.recipes||{}; s.featured=s.featured||[]; s.surplus=s.surplus||[]; s.prefs=s.prefs||[]; s.gchecks=s.gchecks||{}; return s; }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function getRecipe(rid){ return state.recipes[rid] || SEED_RECIPES[rid]; }
+
+/* ====================== DATE HELPERS ====================== */
+function pd(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function sundayOf(d){ const x=new Date(d); x.setDate(x.getDate()-x.getDay()); return x; }
+function fmtShort(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function todayISO(){ return iso(new Date()); }
+
+/* Keep a rolling 3-week horizon: as weeks pass, ask the chef (or seed a placeholder) for new weeks */
+function horizonSundays(){
+  let s0=sundayOf(new Date());
+  // If this calendar week has nothing planned but a later week does, start the horizon there
+  const thisWk=iso(s0);
+  const hasThisWeek=state.plan.some(p=>weekKeyOf(p.date)===thisWk);
+  const hasLater=state.plan.some(p=>weekKeyOf(p.date)>thisWk);
+  if(!hasThisWeek && hasLater){ s0=new Date(s0); s0.setDate(s0.getDate()+7); }
+  return [0,7,14].map(off=>{ const d=new Date(s0); d.setDate(d.getDate()+off); return iso(d); });
+}
+function weekKeyOf(dateStr){ return iso(sundayOf(pd(dateStr))); }
+
+/* ====================== NAVIGATION ====================== */
+let currentRecipe=null, currentGWeek=null;
+function showTab(t){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('scr-'+t).classList.add('active');
+  const tb=document.getElementById('tab-'+(t==='recipe'?'plan':t)); if(tb) tb.classList.add('active');
+  document.getElementById('chef-fab').classList.toggle('show', t==='plan'||t==='recipe');
+  const hdr=document.getElementById('hdr');
+  hdr.textContent = {plan:"This week's dinners", recipe:"Recipe", grocery:"Shopping list", ingredients:"Featured ingredients", settings:"Settings"}[t];
+  window.scrollTo(0,0);
+  if(t==='plan') renderPlan();
+  if(t==='grocery') renderGrocery();
+  if(t==='ingredients') renderIngredients();
+  if(t==='settings') renderSettings();
+}
+
+/* ====================== PLAN SCREEN ====================== */
+function renderPlan(){
+  const el=document.getElementById('plan-list');
+  const suns=horizonSundays();
+  const t=todayISO();
+  let html='';
+  suns.forEach((sun,i)=>{
+    const end=new Date(pd(sun)); end.setDate(end.getDate()+6);
+    const meals=state.plan.filter(p=>weekKeyOf(p.date)===sun).sort((a,b)=>a.date<b.date?-1:1);
+    html+=`<div class="week-label"><span>${i===0?'This week':i===1?'Next week':'Week after'}</span><span class="range">${fmtShort(pd(sun))} – ${fmtShort(end)}</span></div>`;
+    if(!meals.length){
+      html+=`<div class="ticket"><div class="body"><div class="title">Nothing planned yet</div><div class="sub">Ask the chef to fill this week, or it will fill as the horizon rolls forward.</div><div class="tagrow"><button class="btn small primary" onclick="fillWeek('${sun}')">Plan this week</button></div></div></div>`;
+      return;
+    }
+    meals.forEach(m=>{
+      const r=getRecipe(m.rid); if(!r) return;
+      const d=pd(m.date); const past = m.date < t;
+      html+=`<div class="ticket ${m.status==='cooked'?'cooked':''}" onclick="openRecipe('${m.rid}','${m.date}')">
+        <div class="datebox"><div class="dow">${DOW[d.getDay()]}</div><div class="dom">${d.getDate()}</div></div>
+        <div class="body">
+          <div class="title">${esc(r.title)}</div>
+          <div class="sub">${esc(r.desc||'')}</div>
+          <div class="tagrow">
+            <span class="tag ${r.tag}">${r.tag}</span>
+            ${r.frozen?'<span class="tag frozen">freeze → thaw Wed</span>':''}
+            ${mealUsesFeatured(r)?'<span class="tag peak">● featured</span>':''}
+            ${mealUsesSurplus(r)?'<span class="tag surplus">uses surplus</span>':''}
+          </div>
+          <div class="btn-row" style="margin-top:9px">
+            <button class="btn ghost small" onclick="event.stopPropagation(); openMealFeedback('${m.date}')">Adjust</button>
+            <button class="btn ghost small" onclick="event.stopPropagation(); toggleCooked('${m.date}')">${m.status==='cooked'?'Un-mark':'Mark cooked'}</button>
+          </div>
+        </div>
+        <div class="chev">›</div>
+      </div>`;
+    });
+  });
+  el.innerHTML=html;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function mealUsesFeatured(r){ return state.featured.some(f=> JSON.stringify(r.ingredients).toLowerCase().includes(f.toLowerCase().replace(/s$/,''))); }
+function mealUsesSurplus(r){ return state.surplus.some(f=> JSON.stringify(r.ingredients).toLowerCase().includes(f.name.toLowerCase().split(' ').pop().replace(/s$/,''))); }
+function toggleCooked(date){ const m=state.plan.find(p=>p.date===date); if(m){ m.status = m.status==='cooked'?'planned':'cooked'; save(); renderPlan(); } }
+
+/* ====================== RECIPE SCREEN ====================== */
+let scale=1;
+function openRecipe(rid,date){
+  currentRecipe={rid,date}; scale=1;
+  renderRecipe(); showTab('recipe');
+}
+function fmtAmt(a){
+  if(a==null||a==='') return '';
+  const v=a*scale; const frac={0.25:'¼',0.33:'⅓',0.5:'½',0.66:'⅔',0.75:'¾'};
+  const w=Math.floor(v), r=+(v-w).toFixed(2);
+  let fs=''; for(const k in frac){ if(Math.abs(r-k)<0.03){ fs=frac[k]; break; } }
+  if(fs) return (w?w+'':'')+fs;
+  return (Math.round(v*100)/100).toString();
+}
+function renderRecipe(){
+  const r=getRecipe(currentRecipe.rid); const el=document.getElementById('recipe-body');
+  const d=currentRecipe.date?pd(currentRecipe.date):null;
+  el.innerHTML=`
+   <div class="recipe-hero">
+     ${d?`<div class="kicker" style="font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)">${DOW[d.getDay()]} · ${fmtShort(d)}</div>`:''}
+     <h2>${esc(r.title)}</h2>
+     <div class="desc">${esc(r.desc||'')}</div>
+     <div class="tagrow" style="margin-top:8px"><span class="tag ${r.tag}">${r.tag}</span>${r.frozen?'<span class="tag frozen">freeze → thaw Wed</span>':''}</div>
+   </div>
+   <div class="btn-row" style="margin:12px 0">
+     <button class="btn primary" style="flex:1" onclick="startCook()">▶ Start cooking</button>
+     <button class="btn ghost" onclick="openMealFeedback('${currentRecipe.date||''}')">Adjust</button>
+   </div>
+   <div class="card">
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+       <h3 style="margin:0">Ingredients · serves ${2*scale}</h3>
+       <div class="scaler">${[1,2].map(x=>`<button class="${scale===x?'on':''}" onclick="scale=${x};renderRecipe()">×${x}</button>`).join('')}</div>
+     </div>
+     ${r.ingredients.map((g,i)=>`
+       <label class="ing" id="ing-${i}"><input type="checkbox" onchange="this.closest('.ing').classList.toggle('checked',this.checked)">
+       <span><span class="amt">${fmtAmt(g.amount)}${g.unit?' '+g.unit:''}</span> ${esc(g.name)}</span></label>`).join('')}
+   </div>
+   ${r.notes?`<div class="notes">📌 ${esc(r.notes)}</div>`:''}
+   <div class="card">
+     <h3>Steps</h3>
+     ${r.steps.map((s,i)=>`<div class="step"><span class="n">${i+1}</span><span class="st">${esc(s.title)}</span>
+       <div class="sc">${esc(s.content)}${s.timerSeconds?` <b style="color:var(--beet)">· ${Math.round(s.timerSeconds/60)} min</b>`:''}</div></div>`).join('')}
+   </div>`;
+}
+
+/* ====================== COOKING MODE ====================== */
+let cookStep=0, cookTimer=null, cookLeft=0, wakeLock=null, audioCtx=null;
+function startCook(){
+  cookStep=0;
+  document.getElementById('cookmode').classList.add('open');
+  document.getElementById('cm-title').textContent=getRecipe(currentRecipe.rid).title;
+  renderCookStep();
+  if('wakeLock' in navigator){ navigator.wakeLock.request('screen').then(w=>wakeLock=w).catch(()=>{}); }
+}
+function closeCook(){
+  document.getElementById('cookmode').classList.remove('open');
+  stopTimer(); if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+}
+function cookNav(dir){
+  const r=getRecipe(currentRecipe.rid);
+  const n=cookStep+dir;
+  if(n<0) return;
+  if(n>=r.steps.length){ closeCook(); return; }
+  cookStep=n; stopTimer(); renderCookStep();
+}
+function renderCookStep(){
+  const r=getRecipe(currentRecipe.rid); const s=r.steps[cookStep];
+  const mentioned=r.ingredients.filter(g=> s.content.toLowerCase().includes(firstWord(g.name)) );
+  document.getElementById('cm-main').innerHTML=`
+    <div class="cm-stepn">Step ${cookStep+1} of ${r.steps.length}</div>
+    <div class="cm-steptitle">${esc(s.title)}</div>
+    <div class="cm-steptext">${esc(s.content)}</div>
+    ${s.timerSeconds?`<div class="cm-timer"><div class="cm-clock" id="cm-clock">${clock(s.timerSeconds)}</div>
+      <button class="btn gold" id="cm-tbtn" style="margin-top:8px;padding:12px 26px" onclick="toggleTimer(${s.timerSeconds})">Start timer</button></div>`:''}
+    ${mentioned.length?`<div class="cm-ings">${mentioned.map(g=>`<div><b>${fmtAmt(g.amount)}${g.unit?' '+g.unit:''}</b> ${esc(g.name)}</div>`).join('')}</div>`:''}`;
+  document.getElementById('cm-prev').style.visibility = cookStep===0?'hidden':'visible';
+  document.getElementById('cm-next').textContent = cookStep===getRecipe(currentRecipe.rid).steps.length-1 ? 'Finish ✓' : 'Next ›';
+}
+function firstWord(n){ return n.toLowerCase().split(/[ ,(]/)[0]; }
+function clock(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function toggleTimer(total){
+  const btn=document.getElementById('cm-tbtn');
+  if(cookTimer){ stopTimer(); btn.textContent='Resume'; return; }
+  if(!cookLeft) cookLeft=total;
+  btn.textContent='Pause';
+  cookTimer=setInterval(()=>{
+    cookLeft--;
+    const c=document.getElementById('cm-clock'); if(!c){ stopTimer(); return; }
+    c.textContent=clock(Math.max(0,cookLeft));
+    if(cookLeft<=0){ stopTimer(); c.classList.add('done'); c.textContent='Done!'; beep(); if(navigator.vibrate) navigator.vibrate([300,150,300]); }
+  },1000);
+}
+function stopTimer(){ if(cookTimer){ clearInterval(cookTimer); cookTimer=null; } if(cookLeft<=0) cookLeft=0; }
+function beep(){
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    [0,0.4,0.8].forEach(t=>{ const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination); o.frequency.value=880;
+      g.gain.setValueAtTime(0.25,audioCtx.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+t+0.3);
+      o.start(audioCtx.currentTime+t); o.stop(audioCtx.currentTime+t+0.32); });
+  }catch(e){}
+}
+
+/* ====================== GROCERIES ====================== */
+function renderGrocery(){
+  const suns=horizonSundays();
+  if(!currentGWeek || !suns.includes(currentGWeek)) currentGWeek=suns[0];
+  document.getElementById('gweek-tabs').innerHTML = suns.map((s,i)=>{
+    const end=new Date(pd(s)); end.setDate(end.getDate()+6);
+    return `<button class="${s===currentGWeek?'on':''}" onclick="currentGWeek='${s}';renderGrocery()">${i===0?'This week':i===1?'Next week':'Week after'}<br><span style="font-weight:400">${fmtShort(pd(s))}–${fmtShort(end)}</span></button>`;
+  }).join('');
+  const meals=state.plan.filter(p=>weekKeyOf(p.date)===currentGWeek);
+  const agg={};
+  meals.forEach(m=>{
+    const r=getRecipe(m.rid); if(!r) return;
+    r.ingredients.forEach(g=>{
+      if(/optional/i.test(g.name)) return;
+      const key=(g.name.toLowerCase().split(',')[0].trim().replace(/s$/,''))+'|'+(g.unit||'');
+      if(!agg[key]) agg[key]={amount:0,unit:g.unit,name:g.name.split(',')[0].trim(),cat:g.staple?'staple':g.cat,for:[]};
+      agg[key].amount+= (g.amount||0);
+      if(!agg[key].for.includes(r.title)) agg[key].for.push(r.title);
+    });
+  });
+  const cats=[['produce','Produce'],['protein','Protein'],['pantry','Pantry & dairy'],['staple','Staples — check the pantry first']];
+  const checks=state.gchecks[currentGWeek]||{};
+  let html='';
+  cats.forEach(([c,label])=>{
+    const items=Object.entries(agg).filter(([k,v])=>v.cat===c);
+    if(!items.length) return;
+    html+=`<div class="gcat">${label}</div>`;
+    items.sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([k,v])=>{
+      const done=!!checks[k];
+      html+=`<label class="gitem ${done?'done':''}"><input type="checkbox" ${done?'checked':''} onchange="gCheck('${k.replace(/'/g,"\\'")}',this.checked)">
+        <span><span class="gname"><b>${fmtGAmt(v.amount)}${v.unit?' '+v.unit:''}</b> ${esc(v.name)}</span>
+        <span class="gfor">for: ${v.for.map(esc).join(' · ')}</span></span></label>`;
+    });
+  });
+  document.getElementById('grocery-list').innerHTML = html || '<p class="section-note">No meals planned for this week yet.</p>';
+}
+function fmtGAmt(a){ if(!a) return ''; return (Math.round(a*100)/100).toString(); }
+function gCheck(key,val){ state.gchecks[currentGWeek]=state.gchecks[currentGWeek]||{}; state.gchecks[currentGWeek][key]=val; save(); renderGrocery(); }
+function resetGroceryChecks(){ delete state.gchecks[currentGWeek]; save(); renderGrocery(); }
+function copyGroceries(){
+  const lines=[...document.querySelectorAll('#grocery-list .gcat, #grocery-list .gitem')].map(el=>
+    el.classList.contains('gcat') ? '\n'+el.textContent.toUpperCase() : '• '+el.querySelector('.gname').textContent.trim());
+  navigator.clipboard.writeText('SHOPPING LIST — week of '+fmtShort(pd(currentGWeek))+'\n'+lines.join('\n')).then(()=>alert('List copied — paste it anywhere.'));
+}
+
+/* ====================== INGREDIENTS SCREEN ====================== */
+function renderIngredients(){
+  const m=new Date().getMonth()+1;
+  const list=SEASONAL[m]||SEASONAL.def;
+  document.getElementById('season-chips').innerHTML=list.map(x=>{
+    const on=state.featured.includes(x.n);
+    return `<button class="chip ${on?'on':''}" onclick="toggleFeature('${x.n}')">${x.peak?'<span class="dot"></span>':''}${x.n}</button>`;
+  }).join('');
+  document.getElementById('surplus-list').innerHTML = state.surplus.length
+    ? state.surplus.map((s,i)=>`<div class="surp"><span style="flex:1">${esc(s.name)}</span><button class="sx" onclick="rmSurplus(${i})">✕</button></div>`).join('')
+    : '<p class="section-note">Nothing listed. Add anything you want cooked through.</p>';
+}
+function toggleFeature(n){
+  const i=state.featured.indexOf(n);
+  if(i>=0) state.featured.splice(i,1); else state.featured.push(n);
+  save(); renderIngredients();
+}
+function addSurplus(){
+  const el=document.getElementById('surp-in'); const v=el.value.trim(); if(!v) return;
+  state.surplus.push({name:v}); el.value=''; save(); renderIngredients();
+}
+function rmSurplus(i){ state.surplus.splice(i,1); save(); renderIngredients(); }
+
+/* ====================== SETTINGS ====================== */
+function renderSettings(){
+  document.getElementById('apikey').value = state.apiKey||'';
+  document.getElementById('prefs-list').innerHTML = state.prefs.length
+    ? state.prefs.map((p,i)=>`<li>${esc(p)} <button style="color:var(--beet);font-weight:700" onclick="state.prefs.splice(${i},1);save();renderSettings()">✕</button></li>`).join('')
+    : '<li class="muted">None yet — they appear as you give feedback.</li>';
+}
+function saveKey(){
+  state.apiKey=document.getElementById('apikey').value.trim(); save();
+  document.getElementById('key-status').textContent = state.apiKey ? 'Saved ✓' : 'Cleared';
+}
+function hardReset(){ if(confirm('Reset all app data on this device?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
+
+/* ====================== THE CHEF (Claude API) ====================== */
+let chefContext=null; // null = global; or {date} for one meal
+const QUICK_GLOBAL=['Lighter this week','More vegetarian','Faster weeknight meals','Use up our surplus','Surprise us'];
+const QUICK_MEAL=['Doesn\u2019t sound good — swap it','Different protein','Lighter','Faster','Use what we have'];
+
+function openChef(){ chefContext=null; openSheet('Direct the chef','Tell it anything — swap meals, ban an ingredient, shift the whole plan.',QUICK_GLOBAL); }
+function openMealFeedback(date){
+  const m=state.plan.find(p=>p.date===date);
+  chefContext = m ? {date} : null;
+  const r=m?getRecipe(m.rid):null;
+  openSheet(r?('Adjust: '+r.title):'Direct the chef','What would you rather have that night? The chef keeps the week\u2019s shopping efficient.',QUICK_MEAL);
+}
+function openSheet(title,hint,quick){
+  document.getElementById('chef-title').textContent=title;
+  document.getElementById('chef-hint').textContent=hint;
+  document.getElementById('chef-quick').innerHTML=quick.map(q=>`<button onclick="this.classList.toggle('on')">${q}</button>`).join('');
+  document.getElementById('chef-text').value='';
+  document.getElementById('chef-out').innerHTML='';
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('chef-sheet').classList.add('open');
+}
+function closeChef(){
+  document.getElementById('sheet-mask').classList.remove('open');
+  document.getElementById('chef-sheet').classList.remove('open');
+}
+
+function chefSystemPrompt(){
+  return `You are the household chef for a meal-planning app. Household rules:
+- Two adults, ~4 dinners/week, portioned to avoid leftovers.
+- Groceries are bought once, on Sunday. Perishability order across the week: fish/seafood cooked first (Sun/Mon), chicken midweek, other meats late-week only if frozen on day one and thawed from Wednesday (mark these frozen:true).
+- Most weeks include one hearty, protein-rich vegetarian dinner (chickpeas, sweet potatoes, beans, etc.).
+- Be efficient with groceries: shared perishables (a scallion bunch, one herb bunch, limes) should be used across multiple meals in the same week; avoid buying an ingredient one meal uses a tiny amount of unless others share it.
+- Health-conscious but delicious-first.
+Recipes must be practical, ~30-45 min, written for cooking from a phone.
+Respond ONLY with valid JSON, no markdown fences, matching exactly the schema requested.`;
+}
+function contextPayload(){
+  const horizon = state.plan.filter(p=> horizonSundays().includes(weekKeyOf(p.date)) )
+    .map(p=>({date:p.date, status:p.status, recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
+  return { today: todayISO(), plan: horizon, featuredSeasonal: state.featured, surplusAtHome: state.surplus.map(s=>s.name), standingPreferences: state.prefs };
+}
+const RECIPE_SCHEMA=`{"title":str,"tag":"fish|chicken|veg|beef|pork","frozen":bool,"desc":str,"ingredients":[{"amount":num,"unit":"lb|cup|tbsp|tsp|oz|pint|can|'' (empty for countable)","name":str,"cat":"produce|protein|pantry","staple":bool}],"steps":[{"title":str,"content":str,"timerSeconds":num|null}],"notes":str}`;
+
+async function callClaude(userMsg){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-api-key':state.apiKey,
+      'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+    body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:4000,
+      system:chefSystemPrompt(), messages:[{role:'user',content:userMsg}] })
+  });
+  if(!res.ok){ const t=await res.text(); throw new Error('API '+res.status+': '+t.slice(0,180)); }
+  const data=await res.json();
+  const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  return JSON.parse(text.replace(/```json|```/g,'').trim());
+}
+
+async function sendChef(){
+  const quick=[...document.querySelectorAll('#chef-quick button.on')].map(b=>b.textContent);
+  const text=document.getElementById('chef-text').value.trim();
+  const feedback=[...quick, text].filter(Boolean).join('. ');
+  const out=document.getElementById('chef-out');
+  if(!feedback){ out.innerHTML='<div class="err">Add a note or tap a quick option first.</div>'; return; }
+  if(!state.apiKey){
+    state.prefs.push(feedback); save();
+    out.innerHTML='<div class="chef-reply">Saved to the chef\u2019s standing notes. To get live swaps and replies in-app, add your Anthropic API key in Settings.</div>';
+    return;
+  }
+  const btn=document.getElementById('chef-send');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Thinking…'; out.innerHTML='';
+  try{
+    let result;
+    if(chefContext && chefContext.date){
+      const m=state.plan.find(p=>p.date===chefContext.date);
+      const r=getRecipe(m.rid);
+      result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+The meal on ${chefContext.date} is currently "${r.title}" (${r.tag}). User feedback about THIS meal: "${feedback}".
+Replace it with one new dinner that satisfies the feedback, fits that day's perishability slot, and keeps shopping efficient with the other meals that week.
+Return JSON: {"reply": one friendly sentence explaining the change, "newPreference": a short standing preference to remember or null, "recipe": ${RECIPE_SCHEMA}}`);
+      const rid='ai-'+Date.now();
+      state.recipes[rid]=result.recipe; m.rid=rid; m.status='planned';
+    } else {
+      result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+General feedback from the user: "${feedback}".
+Decide which upcoming (today or later, not 'cooked') meals to replace, if any. Keep each week's shopping efficient and the perishability order intact.
+Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing preference or null, "swaps":[{"date":"YYYY-MM-DD","recipe": ${RECIPE_SCHEMA}}]}`);
+      (result.swaps||[]).forEach(sw=>{
+        const m=state.plan.find(p=>p.date===sw.date);
+        if(m && m.status!=='cooked'){ const rid='ai-'+Date.now()+Math.random().toString(36).slice(2,6); state.recipes[rid]=sw.recipe; m.rid=rid; }
+      });
+    }
+    if(result.newPreference){ state.prefs.push(result.newPreference); }
+    save();
+    out.innerHTML=`<div class="chef-reply">👩‍🍳 ${esc(result.reply||'Done — plan updated.')}</div>`;
+    renderPlan();
+    if(document.getElementById('scr-recipe').classList.contains('active') && chefContext){
+      const m=state.plan.find(p=>p.date===chefContext.date);
+      currentRecipe={rid:m.rid,date:m.date}; renderRecipe();
+    }
+    setTimeout(closeChef, 2200);
+  }catch(e){
+    out.innerHTML=`<div class="err">The chef couldn\u2019t answer: ${esc(e.message)}. Check your API key in Settings and try again.</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Send to chef';
+  }
+}
+
+async function fillWeek(sunday){
+  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to generate new weeks.'); return; }
+  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='Planning…'; }
+  try{
+    const result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+Plan the week starting Sunday ${sunday}: four dinners on that Sunday (fish), Tuesday (chicken), Thursday (vegetarian), Saturday (beef or pork, frozen:true). Share perishables across the meals; lean on featured seasonal ingredients and surplus items.
+Return JSON: {"reply": one sentence, "meals":[{"date":"YYYY-MM-DD","recipe": ${RECIPE_SCHEMA}}]}`);
+    (result.meals||[]).forEach(mm=>{
+      const rid='ai-'+Date.now()+Math.random().toString(36).slice(2,6);
+      state.recipes[rid]=mm.recipe;
+      state.plan.push({date:mm.date, rid, status:'planned'});
+    });
+    save(); renderPlan();
+  }catch(e){ alert('Could not plan the week: '+e.message); }
+}
+
+/* ====================== INIT ====================== */
+(function init(){
+  document.getElementById('surp-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addSurplus(); });
+  renderPlan();
+})();
+</script>
+</body>
+</html>
