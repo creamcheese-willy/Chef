@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F2F4EC">
-<title>Dinner — two plates, no leftovers</title>
+<title>Dinner — three servings, leftovers welcome</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,50..100&display=swap" rel="stylesheet">
@@ -187,7 +187,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 <body>
 <div class="wrap">
   <header>
-    <div class="kicker">Two plates · no leftovers</div>
+    <div class="kicker">Three servings · leftovers welcome</div>
     <h1 id="hdr">This week's dinners</h1>
   </header>
 
@@ -266,7 +266,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
     <div class="card set-block">
       <h3 style="margin-top:0">House rules (built in)</h3>
       <ul class="prefs">
-        <li>Two adults, four dinners a week, sized to avoid leftovers.</li>
+        <li>Two adults, four dinners a week — each meal makes three servings: two plates at dinner, one leftover portion.</li>
         <li>Shopping happens Sunday: fish first, then chicken, then other meats (frozen early, thawed midweek).</li>
         <li>One hearty vegetarian meal most weeks — chickpeas, sweet potatoes, beans.</li>
         <li>Share perishables across the week: a bunch of scallions, one herb bunch, limes, etc.</li>
@@ -703,7 +703,7 @@ async function importRecipe(){
       }
     }
     blocks.push({type:'text', text:
-`Convert the recipe ${pendingFile?'in the attached file ':''}${text?'below ':''}into the house format. Keep the author's ingredients and method faithfully — do not reinvent the dish. Split the method into clear phone-sized steps, adding timerSeconds wherever a step involves waiting. Scale ingredient amounts to serve 2 (adapt sensibly) and mention the original yield in "notes" if you scaled. Pick tag by the main protein (veg if none). Mark true pantry staples (oil, salt, spices, rice) with staple:true.
+`Convert the recipe ${pendingFile?'in the attached file ':''}${text?'below ':''}into the house format. Keep the author's ingredients and method faithfully — do not reinvent the dish. Split the method into clear phone-sized steps, adding timerSeconds wherever a step involves waiting. Scale ingredient amounts to serve 3 with "serves":3 (adapt sensibly) and mention the original yield in "notes" if you scaled. Pick tag by the main protein (veg if none). Mark true pantry staples (oil, salt, spices, rice) with staple:true.
 ${text?('Recipe text:\n'+text+'\n'):''}
 Return JSON: {"recipe": ${RECIPE_SCHEMA}}`});
     const result=await callClaude(blocks);
@@ -756,15 +756,18 @@ function deleteRecipe(rid){
 }
 
 /* ====================== RECIPE SCREEN ====================== */
-let scale=1;
+const TARGET_SERVES=3;
+let servTarget=TARGET_SERVES, scale=1;
 function openRecipe(rid,date){
   recipeReturn = document.getElementById('scr-recipes').classList.contains('active') ? 'recipes' : 'plan';
-  currentRecipe={rid,date}; scale=1;
+  currentRecipe={rid,date}; servTarget=TARGET_SERVES;
   renderRecipe(); showTab('recipe');
 }
 function fmtAmt(a){
   if(a==null||a==='') return '';
-  const v=a*scale; const frac={0.25:'¼',0.33:'⅓',0.5:'½',0.66:'⅔',0.75:'¾'};
+  let v=a*scale;
+  if(v>=0.2) v=Math.round(v*4)/4; // snap to cook-friendly quarters
+  const frac={0.25:'¼',0.33:'⅓',0.5:'½',0.66:'⅔',0.75:'¾'};
   const w=Math.floor(v), r=+(v-w).toFixed(2);
   let fs=''; for(const k in frac){ if(Math.abs(r-k)<0.03){ fs=frac[k]; break; } }
   if(fs) return (w?w+'':'')+fs;
@@ -772,6 +775,7 @@ function fmtAmt(a){
 }
 function renderRecipe(){
   const r=getRecipe(currentRecipe.rid); const el=document.getElementById('recipe-body');
+  scale = servTarget/(r.serves||2); // older recipes were written for 2; scale them up automatically
   const d=currentRecipe.date?pd(currentRecipe.date):null;
   const mine=currentRecipe.rid.startsWith('my-');
   el.innerHTML=`
@@ -789,8 +793,8 @@ function renderRecipe(){
    </div>
    <div class="card">
      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-       <h3 style="margin:0">Ingredients · serves ${2*scale}</h3>
-       <div class="scaler">${[1,2].map(x=>`<button class="${scale===x?'on':''}" onclick="scale=${x};renderRecipe()">×${x}</button>`).join('')}</div>
+       <h3 style="margin:0">Ingredients · serves ${servTarget}</h3>
+       <div class="scaler">${[TARGET_SERVES,TARGET_SERVES*2].map(x=>`<button class="${servTarget===x?'on':''}" onclick="servTarget=${x};renderRecipe()">serves ${x}</button>`).join('')}</div>
      </div>
      ${r.ingredients.map((g,i)=>`
        <label class="ing" id="ing-${i}"><input type="checkbox" onchange="this.closest('.ing').classList.toggle('checked',this.checked)">
@@ -875,11 +879,12 @@ function renderGrocery(){
   const agg={};
   meals.forEach(m=>{
     const r=getRecipe(m.rid); if(!r) return;
+    const mult=TARGET_SERVES/(r.serves||2); // scale each recipe's shopping amounts to three servings
     r.ingredients.forEach(g=>{
       if(/optional/i.test(g.name)) return;
       const key=(g.name.toLowerCase().split(',')[0].trim().replace(/s$/,''))+'|'+(g.unit||'');
       if(!agg[key]) agg[key]={amount:0,unit:g.unit,name:g.name.split(',')[0].trim(),cat:g.staple?'staple':g.cat,for:[]};
-      agg[key].amount+= (g.amount||0);
+      agg[key].amount+= (g.amount||0)*mult;
       if(!agg[key].for.includes(r.title)) agg[key].for.push(r.title);
     });
   });
@@ -899,7 +904,7 @@ function renderGrocery(){
   });
   document.getElementById('grocery-list').innerHTML = html || '<p class="section-note">No meals planned for this week yet.</p>';
 }
-function fmtGAmt(a){ if(!a) return ''; return (Math.round(a*100)/100).toString(); }
+function fmtGAmt(a){ if(!a) return ''; let v=a; if(v>=0.2) v=Math.round(v*4)/4; return (Math.round(v*100)/100).toString(); }
 function gCheck(key,val){ state.gchecks[currentGWeek]=state.gchecks[currentGWeek]||{}; state.gchecks[currentGWeek][key]=val; save(); renderGrocery(); }
 function resetGroceryChecks(){ delete state.gchecks[currentGWeek]; save(); renderGrocery(); }
 function copyGroceries(){
@@ -984,7 +989,8 @@ function closeChef(){ closeSheets(); }
 
 function chefSystemPrompt(){
   return `You are the household chef for a meal-planning app. Household rules:
-- Two adults, ~4 dinners/week, portioned to avoid leftovers.
+- Two adults who want leftovers: every dinner makes exactly THREE servings — two plates at dinner plus one leftover portion for lunch. Set "serves":3 on every recipe and portion ingredients for three.
+- Favor dishes that reheat well as leftovers (braises, curries, grain bowls, stews, sheet-pan meals); when a dish degrades reheated (delicate fried textures), say how to store and revive it in "notes".
 - Groceries are bought once, on Sunday. Perishability order across the week: fish/seafood cooked first (Sun/Mon), chicken midweek, other meats late-week only if frozen on day one and thawed from Wednesday (mark these frozen:true).
 - Most weeks include one hearty, protein-rich vegetarian dinner (chickpeas, sweet potatoes, beans, etc.).
 - Be efficient with groceries: shared perishables (a scallion bunch, one herb bunch, limes) should be used across multiple meals in the same week; avoid buying an ingredient one meal uses a tiny amount of unless others share it.
@@ -1011,7 +1017,7 @@ function contextPayload(){
     .map(p=>({recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
   return { today: todayISO(), plan: horizon, recentMeals, tasteProfile: state.taste||'', shoppingStore: state.store||'tj', savedRecipes: savedRecipeList(), featuredSeasonal: state.featured, surplusAtHome: state.surplus.map(s=>s.name), standingPreferences: state.prefs };
 }
-const RECIPE_SCHEMA=`{"title":str,"tag":"fish|chicken|veg|beef|pork","frozen":bool,"desc":str,"ingredients":[{"amount":num,"unit":"lb|cup|tbsp|tsp|oz|pint|can|'' (empty for countable)","name":str,"cat":"produce|protein|pantry","staple":bool}],"steps":[{"title":str,"content":str,"timerSeconds":num|null}],"notes":str}`;
+const RECIPE_SCHEMA=`{"title":str,"serves":3,"tag":"fish|chicken|veg|beef|pork","frozen":bool,"desc":str,"ingredients":[{"amount":num,"unit":"lb|cup|tbsp|tsp|oz|pint|can|'' (empty for countable)","name":str,"cat":"produce|protein|pantry","staple":bool}],"steps":[{"title":str,"content":str,"timerSeconds":num|null}],"notes":str}`;
 
 async function callClaude(userMsg){
   const res=await fetch('https://api.anthropic.com/v1/messages',{
