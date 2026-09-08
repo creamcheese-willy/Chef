@@ -1018,13 +1018,17 @@ async function callClaude(userMsg){
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'x-api-key':state.apiKey,
       'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-    body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:4000,
+    body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:16000,
       system:chefSystemPrompt(), messages:[{role:'user',content:userMsg}] })
   });
   if(!res.ok){ const t=await res.text(); throw new Error('API '+res.status+': '+t.slice(0,180)); }
   const data=await res.json();
   const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
+  if(data.stop_reason==='max_tokens') throw new Error('the reply was too long and got cut off — try again, or plan one meal at a time');
+  // Tolerate any stray text or fences around the JSON: parse from first { to last }
+  const a=text.indexOf('{'), z=text.lastIndexOf('}');
+  if(a<0 || z<=a) throw new Error('no JSON found in the reply — try again');
+  return JSON.parse(text.slice(a, z+1));
 }
 
 /* Resolve a chef result to a recipe id: saved title wins, else store the new recipe */
