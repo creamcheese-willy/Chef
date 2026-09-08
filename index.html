@@ -41,7 +41,7 @@ nav.tabs{
   display:flex; height:calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom:env(safe-area-inset-bottom);
 }
-nav.tabs button{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.68rem; color:var(--ink-soft)}
+nav.tabs button{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.66rem; color:var(--ink-soft)}
 nav.tabs button .ic{font-size:1.25rem; line-height:1}
 nav.tabs button.active{color:var(--beet); font-weight:600}
 
@@ -74,6 +74,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .tag.peak{background:var(--marigold-soft); color:#8a5a10; border:1px solid var(--marigold)}
 .tag.surplus{background:var(--beet-soft); color:var(--beet); border:1px solid var(--beet)}
 .tag.frozen{background:#E8F0F4; color:var(--fish); border:1px solid var(--fish)}
+.tag.mine{background:var(--herb-soft); color:var(--herb); border:1px solid var(--herb)}
 
 /* Buttons */
 .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; padding:12px 16px; font-weight:600; font-size:.95rem}
@@ -137,6 +138,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .gitem.done{opacity:.45}
 .gitem.done .gname{text-decoration:line-through}
 .gitem .gfor{display:block; font-size:.74rem; color:var(--ink-soft)}
+.gfor{display:block; font-size:.74rem; color:var(--ink-soft); font-weight:400}
 
 /* Ingredients screen */
 .chips{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0}
@@ -170,6 +172,9 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .spin{display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:rot .7s linear infinite}
 @keyframes rot{to{transform:rotate(360deg)}}
 .err{background:#FBE9E7; border:1px solid #C6564A; color:#7C2D24; border-radius:12px; padding:10px 12px; font-size:.86rem; margin-top:10px}
+.slotbtn{display:flex; width:100%; align-items:center; justify-content:flex-start; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-weight:600; font-size:.92rem}
+.slotbtn:active{background:var(--beet-soft)}
 
 /* Settings */
 .set-block label{display:block; font-weight:600; font-size:.9rem; margin-bottom:6px}
@@ -194,8 +199,15 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 
   <!-- RECIPE -->
   <section id="scr-recipe" class="screen">
-    <button class="back" onclick="showTab('plan')">‹ Back to plan</button>
+    <button class="back" onclick="showTab(recipeReturn)">‹ Back</button>
     <div id="recipe-body"></div>
+  </section>
+
+  <!-- RECIPE BOX -->
+  <section id="scr-recipes" class="screen">
+    <p class="section-note">Recipes you've brought home — pasted from anywhere you can copy them, or read from a photo, PDF, or text file. The chef knows this box and reaches for it when planning.</p>
+    <button class="btn primary full" onclick="openAddRecipe()">＋ Add a recipe</button>
+    <div id="myrec-list"></div>
   </section>
 
   <!-- GROCERIES -->
@@ -228,8 +240,23 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
     <div class="card set-block">
       <label for="apikey">Anthropic API key</label>
       <input id="apikey" type="password" placeholder="sk-ant-…" autocomplete="off">
-      <p class="muted" style="margin:8px 0 10px">Powers in-app feedback and meal swaps. Stored only on this device, sent only to Anthropic. Get one at console.anthropic.com.</p>
+      <p class="muted" style="margin:8px 0 10px">Powers in-app feedback, meal swaps, and recipe import. Stored only on this device, sent only to Anthropic. Get one at console.anthropic.com.</p>
       <button class="btn primary small" onclick="saveKey()">Save key</button> <span id="key-status" class="muted"></span>
+    </div>
+    <div class="card set-block">
+      <label for="store">Where we shop</label>
+      <select id="store" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; background:var(--card)" onchange="saveStore()">
+        <option value="tj">Trader Joe's — lean on their proprietary shortcuts</option>
+        <option value="flex">TJ's usually, Wegmans when a week is worth the trip</option>
+        <option value="wegmans">Wegmans — full-service, fresh seafood counter</option>
+      </select>
+      <p class="muted" style="margin:8px 0 0">At Trader Joe's, fish is mostly frozen — so fish nights can land any day of the week, thawed overnight. In the flexible mode, the chef says which store it planned each week for. <span id="store-status"></span></p>
+    </div>
+    <div class="card set-block">
+      <label for="taste">What delicious means here</label>
+      <textarea id="taste" style="width:100%; min-height:76px; border:1px solid var(--line); border-radius:10px; padding:11px 12px; background:var(--card); resize:vertical" placeholder="e.g. We love Thai, Mexican, and Sichuan food. Medium-hot spice is welcome. Big on lime, fresh herbs, and anything charred. Plain roasted chicken and steamed vegetables bore us."></textarea>
+      <p class="muted" style="margin:8px 0 10px">Cuisines you love, spice tolerance, flavors you crave, what reads as bland to you. The chef treats this as the house definition of delicious.</p>
+      <button class="btn primary small" onclick="saveTaste()">Save taste profile</button> <span id="taste-status" class="muted"></span>
     </div>
     <div class="card set-block">
       <h3 style="margin-top:0">The chef's standing notes</h3>
@@ -243,12 +270,13 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
         <li>Shopping happens Sunday: fish first, then chicken, then other meats (frozen early, thawed midweek).</li>
         <li>One hearty vegetarian meal most weeks — chickpeas, sweet potatoes, beans.</li>
         <li>Share perishables across the week: a bunch of scallions, one herb bunch, limes, etc.</li>
+        <li>Recipes saved to the box get first consideration when they fit the week.</li>
         <li>Health-conscious but delicious-first.</li>
       </ul>
     </div>
     <div class="card set-block">
       <button class="btn ghost small" onclick="hardReset()">Reset app data</button>
-      <p class="muted" style="margin-top:8px">Clears plans, checks, features and surplus on this device.</p>
+      <p class="muted" style="margin-top:8px">Clears plans, checks, saved recipes, features and surplus on this device.</p>
     </div>
   </section>
 </div>
@@ -257,13 +285,14 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 
 <nav class="tabs">
   <button id="tab-plan" class="active" onclick="showTab('plan')"><span class="ic">🗓️</span>Plan</button>
+  <button id="tab-recipes" onclick="showTab('recipes')"><span class="ic">📖</span>Recipes</button>
   <button id="tab-grocery" onclick="showTab('grocery')"><span class="ic">🧺</span>Groceries</button>
   <button id="tab-ingredients" onclick="showTab('ingredients')"><span class="ic">🌽</span>Ingredients</button>
   <button id="tab-settings" onclick="showTab('settings')"><span class="ic">⚙️</span>Settings</button>
 </nav>
 
 <!-- Chef / feedback sheet -->
-<div class="sheet-mask" id="sheet-mask" onclick="closeChef()"></div>
+<div class="sheet-mask" id="sheet-mask" onclick="closeSheets()"></div>
 <div class="sheet" id="chef-sheet">
   <h3 id="chef-title">Direct the chef</h3>
   <p class="hint" id="chef-hint">Tell it anything — swap a meal, ban an ingredient, ask for lighter weeks.</p>
@@ -273,6 +302,30 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
     <button class="btn primary full" id="chef-send" onclick="sendChef()">Send to chef</button>
   </div>
   <div id="chef-out"></div>
+</div>
+
+<!-- Add-recipe sheet -->
+<div class="sheet" id="add-sheet">
+  <h3>Add a recipe</h3>
+  <p class="hint">Paste recipe text below, or attach a photo of a cookbook page, a PDF, or a text file. The chef reads it, keeps the author's quantities and method, and files it in the house format sized for two.</p>
+  <textarea id="add-text" placeholder="Paste a recipe here…"></textarea>
+  <div class="btn-row" style="margin-top:10px; align-items:center">
+    <label class="btn ghost small" style="cursor:pointer">📎 Attach photo / PDF / text
+      <input id="add-file" type="file" accept=".txt,.md,text/plain,application/pdf,image/png,image/jpeg,image/webp" style="display:none" onchange="fileChosen()">
+    </label>
+    <span id="add-filename" class="muted"></span>
+  </div>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="btn primary full" id="add-save" onclick="importRecipe()">Save to recipe box</button>
+  </div>
+  <div id="add-out"></div>
+</div>
+
+<!-- Plan-picker sheet -->
+<div class="sheet" id="plan-sheet">
+  <h3>Put it on the plan</h3>
+  <p class="hint">Pick a night. Choosing a night that already has a meal swaps it out.</p>
+  <div id="plan-slots"></div>
 </div>
 
 <!-- Cooking mode -->
@@ -487,9 +540,9 @@ function defaultPlan(){
 let state = load();
 function load(){
   try{ const s = JSON.parse(localStorage.getItem(LS_KEY)); if(s && s.plan) return migrate(s); }catch(e){}
-  return { plan: defaultPlan(), recipes: {}, featured: [], surplus: [], prefs: [], gchecks: {}, apiKey:'' };
+  return { plan: defaultPlan(), recipes: {}, featured: [], surplus: [], prefs: [], gchecks: {}, apiKey:'', taste:'', store:'tj' };
 }
-function migrate(s){ s.recipes=s.recipes||{}; s.featured=s.featured||[]; s.surplus=s.surplus||[]; s.prefs=s.prefs||[]; s.gchecks=s.gchecks||{}; return s; }
+function migrate(s){ s.recipes=s.recipes||{}; s.featured=s.featured||[]; s.surplus=s.surplus||[]; s.prefs=s.prefs||[]; s.gchecks=s.gchecks||{}; s.taste=s.taste||''; s.store=s.store||'tj'; return s; }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 function getRecipe(rid){ return state.recipes[rid] || SEED_RECIPES[rid]; }
 
@@ -514,17 +567,18 @@ function horizonSundays(){
 function weekKeyOf(dateStr){ return iso(sundayOf(pd(dateStr))); }
 
 /* ====================== NAVIGATION ====================== */
-let currentRecipe=null, currentGWeek=null;
+let currentRecipe=null, currentGWeek=null, recipeReturn='plan';
 function showTab(t){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById('scr-'+t).classList.add('active');
-  const tb=document.getElementById('tab-'+(t==='recipe'?'plan':t)); if(tb) tb.classList.add('active');
+  const tb=document.getElementById('tab-'+(t==='recipe'?recipeReturn:t)); if(tb) tb.classList.add('active');
   document.getElementById('chef-fab').classList.toggle('show', t==='plan'||t==='recipe');
   const hdr=document.getElementById('hdr');
-  hdr.textContent = {plan:"This week's dinners", recipe:"Recipe", grocery:"Shopping list", ingredients:"Featured ingredients", settings:"Settings"}[t];
+  hdr.textContent = {plan:"This week's dinners", recipe:"Recipe", recipes:"Recipe box", grocery:"Shopping list", ingredients:"Featured ingredients", settings:"Settings"}[t];
   window.scrollTo(0,0);
   if(t==='plan') renderPlan();
+  if(t==='recipes') renderRecipes();
   if(t==='grocery') renderGrocery();
   if(t==='ingredients') renderIngredients();
   if(t==='settings') renderSettings();
@@ -555,6 +609,7 @@ function renderPlan(){
           <div class="tagrow">
             <span class="tag ${r.tag}">${r.tag}</span>
             ${r.frozen?'<span class="tag frozen">freeze → thaw Wed</span>':''}
+            ${m.rid.startsWith('my-')?'<span class="tag mine">from your box</span>':''}
             ${mealUsesFeatured(r)?'<span class="tag peak">● featured</span>':''}
             ${mealUsesSurplus(r)?'<span class="tag surplus">uses surplus</span>':''}
           </div>
@@ -574,9 +629,136 @@ function mealUsesFeatured(r){ return state.featured.some(f=> JSON.stringify(r.in
 function mealUsesSurplus(r){ return state.surplus.some(f=> JSON.stringify(r.ingredients).toLowerCase().includes(f.name.toLowerCase().split(' ').pop().replace(/s$/,''))); }
 function toggleCooked(date){ const m=state.plan.find(p=>p.date===date); if(m){ m.status = m.status==='cooked'?'planned':'cooked'; save(); renderPlan(); } }
 
+/* ====================== RECIPE BOX ====================== */
+function myRecipeIds(){ return Object.keys(state.recipes).filter(k=>k.startsWith('my-')).sort((a,b)=>b.localeCompare(a)); }
+function savedRecipeList(){ return myRecipeIds().map(id=>({title:state.recipes[id].title, tag:state.recipes[id].tag})); }
+function ridBySavedTitle(t){
+  if(!t) return null;
+  return myRecipeIds().find(id=>state.recipes[id].title.toLowerCase()===String(t).toLowerCase()) || null;
+}
+function recipeRow(id, mine){
+  const r=getRecipe(id); if(!r) return '';
+  return `<div class="ticket" onclick="openRecipe('${id}',null)">
+    <div class="body">
+      <div class="title">${esc(r.title)}</div>
+      <div class="sub">${esc(r.desc||'')}</div>
+      <div class="tagrow"><span class="tag ${r.tag}">${r.tag}</span>${mine?'<span class="tag mine">yours</span>':''}</div>
+    </div>
+    <div class="chev">›</div>
+  </div>`;
+}
+function renderRecipes(){
+  const el=document.getElementById('myrec-list');
+  const mine=myRecipeIds();
+  let html=`<div class="week-label"><span>Your recipe box</span></div>`;
+  html+= mine.length
+    ? mine.map(id=>recipeRow(id,true)).join('')
+    : `<p class="section-note">Nothing saved yet. Tap <b>Add a recipe</b> and paste one in — anything you can copy from a site you subscribe to, or a photo of a cookbook page, goes straight into your personal box.</p>`;
+  const chefIds=Object.keys(state.recipes).filter(k=>k.startsWith('ai-'));
+  html+=`<div class="week-label" style="margin-top:22px"><span>The chef's collection</span></div>`;
+  html+= Object.keys(SEED_RECIPES).concat(chefIds).map(id=>recipeRow(id,false)).join('');
+  el.innerHTML=html;
+}
+
+let pendingFile=null;
+function openAddRecipe(){
+  pendingFile=null;
+  document.getElementById('add-text').value='';
+  document.getElementById('add-out').innerHTML='';
+  document.getElementById('add-filename').textContent='';
+  document.getElementById('add-file').value='';
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('add-sheet').classList.add('open');
+}
+function fileChosen(){
+  const f=document.getElementById('add-file').files[0];
+  pendingFile=f||null;
+  document.getElementById('add-filename').textContent = f ? f.name+' ✓' : '';
+}
+function fileToB64(f){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('Could not read the file'));
+    r.readAsDataURL(f);
+  });
+}
+async function importRecipe(){
+  const out=document.getElementById('add-out');
+  const text=document.getElementById('add-text').value.trim();
+  if(!text && !pendingFile){ out.innerHTML='<div class="err">Paste a recipe or attach a file first.</div>'; return; }
+  if(!state.apiKey){ out.innerHTML='<div class="err">Recipe import uses the chef — add your Anthropic API key in Settings first.</div>'; return; }
+  if(pendingFile && pendingFile.size > 4.5*1024*1024){ out.innerHTML='<div class="err">That file is too big (over ~4.5 MB). Try a smaller photo, or paste the text instead.</div>'; return; }
+  const btn=document.getElementById('add-save');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Filing it away…'; out.innerHTML='';
+  try{
+    const blocks=[];
+    if(pendingFile){
+      if(pendingFile.type==='application/pdf'){
+        blocks.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:await fileToB64(pendingFile)}});
+      } else if(pendingFile.type.startsWith('image/')){
+        blocks.push({type:'image', source:{type:'base64', media_type:pendingFile.type, data:await fileToB64(pendingFile)}});
+      } else {
+        blocks.push({type:'text', text:'Recipe file contents:\n'+(await pendingFile.text())});
+      }
+    }
+    blocks.push({type:'text', text:
+`Convert the recipe ${pendingFile?'in the attached file ':''}${text?'below ':''}into the house format. Keep the author's ingredients and method faithfully — do not reinvent the dish. Split the method into clear phone-sized steps, adding timerSeconds wherever a step involves waiting. Scale ingredient amounts to serve 2 (adapt sensibly) and mention the original yield in "notes" if you scaled. Pick tag by the main protein (veg if none). Mark true pantry staples (oil, salt, spices, rice) with staple:true.
+${text?('Recipe text:\n'+text+'\n'):''}
+Return JSON: {"recipe": ${RECIPE_SCHEMA}}`});
+    const result=await callClaude(blocks);
+    if(!result.recipe || !result.recipe.title) throw new Error('could not find a recipe in that');
+    const rid='my-'+Date.now();
+    state.recipes[rid]=result.recipe; save();
+    out.innerHTML=`<div class="chef-reply">📖 Saved “${esc(result.recipe.title)}” to your recipe box.</div>`;
+    renderRecipes();
+    setTimeout(closeSheets, 1600);
+  }catch(e){
+    out.innerHTML=`<div class="err">Couldn’t import it: ${esc(e.message)}. Check the file or your API key and try again.</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Save to recipe box';
+  }
+}
+
+let planTarget=null;
+function openPlanPicker(rid){
+  planTarget=rid;
+  const suns=horizonSundays(); const t=todayISO();
+  let html='';
+  suns.forEach((sun,i)=>{
+    let wk='';
+    [0,2,4,6].forEach(off=>{
+      const d=new Date(pd(sun)); d.setDate(d.getDate()+off); const ds=iso(d);
+      if(ds<t) return;
+      const m=state.plan.find(p=>p.date===ds);
+      const cur=m?getRecipe(m.rid):null;
+      wk+=`<button class="slotbtn" onclick="planRecipeOn('${ds}')">
+        <span><b>${DOW[d.getDay()]} · ${fmtShort(d)}</b>
+        <span class="gfor">${cur?('swaps out: '+esc(cur.title)):'open night'}</span></span></button>`;
+    });
+    if(wk) html+=`<div class="gcat">${i===0?'This week':i===1?'Next week':'Week after'}</div>`+wk;
+  });
+  document.getElementById('plan-slots').innerHTML = html || '<p class="section-note">No upcoming nights in the horizon.</p>';
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('plan-sheet').classList.add('open');
+}
+function planRecipeOn(ds){
+  const m=state.plan.find(p=>p.date===ds);
+  if(m){ m.rid=planTarget; m.status='planned'; }
+  else state.plan.push({date:ds, rid:planTarget, status:'planned'});
+  save(); closeSheets(); showTab('plan');
+}
+function deleteRecipe(rid){
+  if(!confirm('Remove this recipe from your box? Any planned nights using it will be cleared.')) return;
+  state.plan=state.plan.filter(p=>p.rid!==rid);
+  delete state.recipes[rid];
+  save(); showTab('recipes');
+}
+
 /* ====================== RECIPE SCREEN ====================== */
 let scale=1;
 function openRecipe(rid,date){
+  recipeReturn = document.getElementById('scr-recipes').classList.contains('active') ? 'recipes' : 'plan';
   currentRecipe={rid,date}; scale=1;
   renderRecipe(); showTab('recipe');
 }
@@ -591,16 +773,19 @@ function fmtAmt(a){
 function renderRecipe(){
   const r=getRecipe(currentRecipe.rid); const el=document.getElementById('recipe-body');
   const d=currentRecipe.date?pd(currentRecipe.date):null;
+  const mine=currentRecipe.rid.startsWith('my-');
   el.innerHTML=`
    <div class="recipe-hero">
      ${d?`<div class="kicker" style="font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)">${DOW[d.getDay()]} · ${fmtShort(d)}</div>`:''}
      <h2>${esc(r.title)}</h2>
      <div class="desc">${esc(r.desc||'')}</div>
-     <div class="tagrow" style="margin-top:8px"><span class="tag ${r.tag}">${r.tag}</span>${r.frozen?'<span class="tag frozen">freeze → thaw Wed</span>':''}</div>
+     <div class="tagrow" style="margin-top:8px"><span class="tag ${r.tag}">${r.tag}</span>${r.frozen?'<span class="tag frozen">freeze → thaw Wed</span>':''}${mine?'<span class="tag mine">yours</span>':''}</div>
    </div>
    <div class="btn-row" style="margin:12px 0">
      <button class="btn primary" style="flex:1" onclick="startCook()">▶ Start cooking</button>
-     <button class="btn ghost" onclick="openMealFeedback('${currentRecipe.date||''}')">Adjust</button>
+     ${currentRecipe.date
+       ?`<button class="btn ghost" onclick="openMealFeedback('${currentRecipe.date}')">Adjust</button>`
+       :`<button class="btn ghost" onclick="openPlanPicker('${currentRecipe.rid}')">Add to plan</button>`}
    </div>
    <div class="card">
      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -616,7 +801,8 @@ function renderRecipe(){
      <h3>Steps</h3>
      ${r.steps.map((s,i)=>`<div class="step"><span class="n">${i+1}</span><span class="st">${esc(s.title)}</span>
        <div class="sc">${esc(s.content)}${s.timerSeconds?` <b style="color:var(--beet)">· ${Math.round(s.timerSeconds/60)} min</b>`:''}</div></div>`).join('')}
-   </div>`;
+   </div>
+   ${mine?`<button class="back" style="color:#7C2D24" onclick="deleteRecipe('${currentRecipe.rid}')">Remove from recipe box</button>`:''}`;
 }
 
 /* ====================== COOKING MODE ====================== */
@@ -717,9 +903,10 @@ function fmtGAmt(a){ if(!a) return ''; return (Math.round(a*100)/100).toString()
 function gCheck(key,val){ state.gchecks[currentGWeek]=state.gchecks[currentGWeek]||{}; state.gchecks[currentGWeek][key]=val; save(); renderGrocery(); }
 function resetGroceryChecks(){ delete state.gchecks[currentGWeek]; save(); renderGrocery(); }
 function copyGroceries(){
+  const storeName={tj:"Trader Joe's",wegmans:'Wegmans',flex:"Trader Joe's (default)"}[state.store||'tj'];
   const lines=[...document.querySelectorAll('#grocery-list .gcat, #grocery-list .gitem')].map(el=>
     el.classList.contains('gcat') ? '\n'+el.textContent.toUpperCase() : '• '+el.querySelector('.gname').textContent.trim());
-  navigator.clipboard.writeText('SHOPPING LIST — week of '+fmtShort(pd(currentGWeek))+'\n'+lines.join('\n')).then(()=>alert('List copied — paste it anywhere.'));
+  navigator.clipboard.writeText('SHOPPING LIST ('+storeName+') — week of '+fmtShort(pd(currentGWeek))+'\n'+lines.join('\n')).then(()=>alert('List copied — paste it anywhere.'));
 }
 
 /* ====================== INGREDIENTS SCREEN ====================== */
@@ -748,6 +935,8 @@ function rmSurplus(i){ state.surplus.splice(i,1); save(); renderIngredients(); }
 /* ====================== SETTINGS ====================== */
 function renderSettings(){
   document.getElementById('apikey').value = state.apiKey||'';
+  document.getElementById('taste').value = state.taste||'';
+  document.getElementById('store').value = state.store||'tj';
   document.getElementById('prefs-list').innerHTML = state.prefs.length
     ? state.prefs.map((p,i)=>`<li>${esc(p)} <button style="color:var(--beet);font-weight:700" onclick="state.prefs.splice(${i},1);save();renderSettings()">✕</button></li>`).join('')
     : '<li class="muted">None yet — they appear as you give feedback.</li>';
@@ -756,12 +945,20 @@ function saveKey(){
   state.apiKey=document.getElementById('apikey').value.trim(); save();
   document.getElementById('key-status').textContent = state.apiKey ? 'Saved ✓' : 'Cleared';
 }
+function saveTaste(){
+  state.taste=document.getElementById('taste').value.trim(); save();
+  document.getElementById('taste-status').textContent = state.taste ? 'Saved ✓' : 'Cleared';
+}
+function saveStore(){
+  state.store=document.getElementById('store').value; save();
+  document.getElementById('store-status').textContent='Saved ✓';
+}
 function hardReset(){ if(confirm('Reset all app data on this device?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
 
 /* ====================== THE CHEF (Claude API) ====================== */
 let chefContext=null; // null = global; or {date} for one meal
-const QUICK_GLOBAL=['Lighter this week','More vegetarian','Faster weeknight meals','Use up our surplus','Surprise us'];
-const QUICK_MEAL=['Doesn\u2019t sound good — swap it','Different protein','Lighter','Faster','Use what we have'];
+const QUICK_GLOBAL=['Bolder, brighter flavors','Lean on TJ\u2019s shortcuts','Lighter this week','More vegetarian','Faster weeknight meals','Use up our surplus','Use our saved recipes','Surprise us'];
+const QUICK_MEAL=['Doesn\u2019t sound good — swap it','Too plain — more flavor','Different protein','Lighter','Faster','Use what we have','Something from our box'];
 
 function openChef(){ chefContext=null; openSheet('Direct the chef','Tell it anything — swap meals, ban an ingredient, shift the whole plan.',QUICK_GLOBAL); }
 function openMealFeedback(date){
@@ -779,10 +976,11 @@ function openSheet(title,hint,quick){
   document.getElementById('sheet-mask').classList.add('open');
   document.getElementById('chef-sheet').classList.add('open');
 }
-function closeChef(){
+function closeSheets(){
   document.getElementById('sheet-mask').classList.remove('open');
-  document.getElementById('chef-sheet').classList.remove('open');
+  ['chef-sheet','add-sheet','plan-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
 }
+function closeChef(){ closeSheets(); }
 
 function chefSystemPrompt(){
   return `You are the household chef for a meal-planning app. Household rules:
@@ -791,13 +989,27 @@ function chefSystemPrompt(){
 - Most weeks include one hearty, protein-rich vegetarian dinner (chickpeas, sweet potatoes, beans, etc.).
 - Be efficient with groceries: shared perishables (a scallion bunch, one herb bunch, limes) should be used across multiple meals in the same week; avoid buying an ingredient one meal uses a tiny amount of unless others share it.
 - Health-conscious but delicious-first.
+Flavor doctrine — the most common failure mode is blandness; avoid it aggressively:
+- Every dinner cooks from a specific cuisine or dish tradition (name it in "desc"), never a generic protein-veg-starch formula. Vary traditions across the week; don't lean on the same flavor profile twice in one week or repeat anything in recentMeals.
+- Build contrast into every plate: rich needs acid (citrus, vinegar, pickled things), soft needs crunch, and nearly everything needs a finishing element — fresh herbs, toasted nuts, quick-pickled onion, chili crisp, a sauce.
+- Season assertively: garlic, ginger, and chiles in real quantities; spices bloomed in fat; marinades when time allows; salt at every stage. Timid seasoning is a bug, not caution.
+- Prefer high-flavor techniques: hard sears, charring, caramelization, pan sauces and glazes — over plain roasting or steaming.
+- The user's tasteProfile in context is the definition of delicious for this household; it overrides these defaults where they conflict.
+Shopping store (context field shoppingStore):
+- "tj" = Trader Joe's: small store, limited generic selection, but excellent proprietary shortcuts. Confidently build meals around long-running Trader Joe's staples — frozen sweet potato or cauliflower gnocchi, their chicken sausages, frozen wild fish fillets and shrimp, jarred sauces (chili onion crunch, green dragon, thai curry sauces), fresh pizza dough, frozen rice, marinated proteins. Name proprietary items "Trader Joe's …" in ingredient names so the shopping list is unambiguous. Only reference well-known, long-running items; if unsure a product exists or it's seasonal, describe it generically instead of inventing a name. Fish there is mostly frozen, so a fish night may be scheduled ANY day of the week (note "thaw in the fridge the night before" in the recipe notes) — the Sunday-fresh-fish rule applies only when fish is bought fresh.
+- "wegmans" = Wegmans: full-service supermarket with a real seafood counter, butcher, deep produce and international aisles. Fresh fish goes Sunday per the house rules; specialty ingredients are fair game.
+- "flex" = plan for Trader Joe's by default, but when a week would be meaningfully better shopped at Wegmans (a fresh-seafood dinner, specialty produce), plan that week for Wegmans and say which store in "reply".
+- The user keeps a personal recipe box; its contents are listed in context as savedRecipes. When a saved recipe fits the request and the night's perishability slot, prefer scheduling it over inventing something new. To schedule one, return its exact title in a "savedTitle" field instead of a full recipe object.
 Recipes must be practical, ~30-45 min, written for cooking from a phone.
 Respond ONLY with valid JSON, no markdown fences, matching exactly the schema requested.`;
 }
 function contextPayload(){
   const horizon = state.plan.filter(p=> horizonSundays().includes(weekKeyOf(p.date)) )
     .map(p=>({date:p.date, status:p.status, recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
-  return { today: todayISO(), plan: horizon, featuredSeasonal: state.featured, surplusAtHome: state.surplus.map(s=>s.name), standingPreferences: state.prefs };
+  const recentMeals = state.plan.filter(p=> p.status==='cooked' || p.date < todayISO())
+    .sort((a,b)=> b.date.localeCompare(a.date)).slice(0,12)
+    .map(p=>({recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
+  return { today: todayISO(), plan: horizon, recentMeals, tasteProfile: state.taste||'', shoppingStore: state.store||'tj', savedRecipes: savedRecipeList(), featuredSeasonal: state.featured, surplusAtHome: state.surplus.map(s=>s.name), standingPreferences: state.prefs };
 }
 const RECIPE_SCHEMA=`{"title":str,"tag":"fish|chicken|veg|beef|pork","frozen":bool,"desc":str,"ingredients":[{"amount":num,"unit":"lb|cup|tbsp|tsp|oz|pint|can|'' (empty for countable)","name":str,"cat":"produce|protein|pantry","staple":bool}],"steps":[{"title":str,"content":str,"timerSeconds":num|null}],"notes":str}`;
 
@@ -813,6 +1025,17 @@ async function callClaude(userMsg){
   const data=await res.json();
   const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
   return JSON.parse(text.replace(/```json|```/g,'').trim());
+}
+
+/* Resolve a chef result to a recipe id: saved title wins, else store the new recipe */
+function resolveChefRecipe(savedTitle, recipe){
+  const rid=ridBySavedTitle(savedTitle);
+  if(rid) return rid;
+  if(recipe && recipe.title){
+    const nid='ai-'+Date.now()+Math.random().toString(36).slice(2,6);
+    state.recipes[nid]=recipe; return nid;
+  }
+  return null;
 }
 
 async function sendChef(){
@@ -836,19 +1059,19 @@ async function sendChef(){
       result=await callClaude(
 `Context: ${JSON.stringify(contextPayload())}
 The meal on ${chefContext.date} is currently "${r.title}" (${r.tag}). User feedback about THIS meal: "${feedback}".
-Replace it with one new dinner that satisfies the feedback, fits that day's perishability slot, and keeps shopping efficient with the other meals that week.
-Return JSON: {"reply": one friendly sentence explaining the change, "newPreference": a short standing preference to remember or null, "recipe": ${RECIPE_SCHEMA}}`);
-      const rid='ai-'+Date.now();
-      state.recipes[rid]=result.recipe; m.rid=rid; m.status='planned';
+Replace it with one dinner that satisfies the feedback, fits that day's perishability slot, and keeps shopping efficient with the other meals that week. Prefer a saved recipe from the box if one fits.
+Return JSON: {"reply": one friendly sentence explaining the change, "newPreference": a short standing preference to remember or null, "savedTitle": exact title of a saved recipe to use or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}`);
+      const rid=resolveChefRecipe(result.savedTitle, result.recipe);
+      if(rid){ m.rid=rid; m.status='planned'; }
     } else {
       result=await callClaude(
 `Context: ${JSON.stringify(contextPayload())}
 General feedback from the user: "${feedback}".
-Decide which upcoming (today or later, not 'cooked') meals to replace, if any. Keep each week's shopping efficient and the perishability order intact.
-Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing preference or null, "swaps":[{"date":"YYYY-MM-DD","recipe": ${RECIPE_SCHEMA}}]}`);
+Decide which upcoming (today or later, not 'cooked') meals to replace, if any. Keep each week's shopping efficient and the perishability order intact. Prefer saved recipes from the box where they fit.
+Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing preference or null, "swaps":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
       (result.swaps||[]).forEach(sw=>{
         const m=state.plan.find(p=>p.date===sw.date);
-        if(m && m.status!=='cooked'){ const rid='ai-'+Date.now()+Math.random().toString(36).slice(2,6); state.recipes[rid]=sw.recipe; m.rid=rid; }
+        if(m && m.status!=='cooked'){ const rid=resolveChefRecipe(sw.savedTitle, sw.recipe); if(rid) m.rid=rid; }
       });
     }
     if(result.newPreference){ state.prefs.push(result.newPreference); }
@@ -859,7 +1082,7 @@ Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing p
       const m=state.plan.find(p=>p.date===chefContext.date);
       currentRecipe={rid:m.rid,date:m.date}; renderRecipe();
     }
-    setTimeout(closeChef, 2200);
+    setTimeout(closeSheets, 2200);
   }catch(e){
     out.innerHTML=`<div class="err">The chef couldn\u2019t answer: ${esc(e.message)}. Check your API key in Settings and try again.</div>`;
   }finally{
@@ -873,12 +1096,11 @@ async function fillWeek(sunday){
   try{
     const result=await callClaude(
 `Context: ${JSON.stringify(contextPayload())}
-Plan the week starting Sunday ${sunday}: four dinners on that Sunday (fish), Tuesday (chicken), Thursday (vegetarian), Saturday (beef or pork, frozen:true). Share perishables across the meals; lean on featured seasonal ingredients and surplus items.
-Return JSON: {"reply": one sentence, "meals":[{"date":"YYYY-MM-DD","recipe": ${RECIPE_SCHEMA}}]}`);
+Plan the week starting Sunday ${sunday}: four dinners on that Sunday (fish), Tuesday (chicken), Thursday (vegetarian), Saturday (beef or pork, frozen:true). Share perishables across the meals; lean on featured seasonal ingredients, surplus items, and saved recipes from the box when they fit the slots.
+Return JSON: {"reply": one sentence, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
     (result.meals||[]).forEach(mm=>{
-      const rid='ai-'+Date.now()+Math.random().toString(36).slice(2,6);
-      state.recipes[rid]=mm.recipe;
-      state.plan.push({date:mm.date, rid, status:'planned'});
+      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe);
+      if(rid) state.plan.push({date:mm.date, rid, status:'planned'});
     });
     save(); renderPlan();
   }catch(e){ alert('Could not plan the week: '+e.message); }
