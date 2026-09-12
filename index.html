@@ -195,6 +195,14 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
   <section id="scr-plan" class="screen active">
     <p class="section-note">Three weeks out. Tap a meal for the recipe; use <b>Adjust</b> on any meal — or the <b>Chef</b> button — to change direction on the spot.</p>
     <div id="plan-list"></div>
+    <button class="btn ghost full" style="margin:6px 0 14px" onclick="showTab('archive')">🗄️ Past weeks</button>
+  </section>
+
+  <!-- ARCHIVE -->
+  <section id="scr-archive" class="screen">
+    <button class="back" onclick="showTab('plan')">‹ Back to plan</button>
+    <p class="section-note">Every week the app has planned, newest first. Tap any meal to revisit the recipe — and keep the ones worth repeating in your recipe box.</p>
+    <div id="archive-list"></div>
   </section>
 
   <!-- RECIPE -->
@@ -573,13 +581,14 @@ function showTab(t){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById('scr-'+t).classList.add('active');
-  const tb=document.getElementById('tab-'+(t==='recipe'?recipeReturn:t)); if(tb) tb.classList.add('active');
+  const tb=document.getElementById('tab-'+(t==='recipe'?recipeReturn==='recipes'?'recipes':'plan':t==='archive'?'plan':t)); if(tb) tb.classList.add('active');
   document.getElementById('chef-fab').classList.toggle('show', t==='plan'||t==='recipe');
   const hdr=document.getElementById('hdr');
-  hdr.textContent = {plan:"This week's dinners", recipe:"Recipe", recipes:"Recipe box", grocery:"Shopping list", ingredients:"Featured ingredients", settings:"Settings"}[t];
+  hdr.textContent = {plan:"This week's dinners", recipe:"Recipe", recipes:"Recipe box", archive:"Archive", grocery:"Shopping list", ingredients:"Featured ingredients", settings:"Settings"}[t];
   window.scrollTo(0,0);
   if(t==='plan') renderPlan();
   if(t==='recipes') renderRecipes();
+  if(t==='archive') renderArchive();
   if(t==='grocery') renderGrocery();
   if(t==='ingredients') renderIngredients();
   if(t==='settings') renderSettings();
@@ -756,11 +765,55 @@ function deleteRecipe(rid){
   save(); showTab('recipes');
 }
 
+/* ====================== ARCHIVE ====================== */
+function renderArchive(){
+  const el=document.getElementById('archive-list');
+  const cutoff=horizonSundays()[0]; // anything before the current horizon is history
+  const weeks={};
+  state.plan.forEach(p=>{
+    const wk=weekKeyOf(p.date);
+    if(wk<cutoff){ (weeks[wk]=weeks[wk]||[]).push(p); }
+  });
+  const keys=Object.keys(weeks).sort((a,b)=>b.localeCompare(a));
+  if(!keys.length){ el.innerHTML='<p class="section-note">Nothing here yet — weeks land in the archive as the plan rolls past them.</p>'; return; }
+  let html='';
+  keys.forEach(wk=>{
+    const end=new Date(pd(wk)); end.setDate(end.getDate()+6);
+    const meals=weeks[wk].sort((a,b)=>a.date.localeCompare(b.date));
+    const cooked=meals.filter(m=>m.status==='cooked').length;
+    html+=`<div class="week-label"><span>Week of ${fmtShort(pd(wk))}</span><span class="range">${cooked}/${meals.length} cooked</span></div>`;
+    meals.forEach(m=>{
+      const r=getRecipe(m.rid); if(!r) return;
+      const d=pd(m.date);
+      html+=`<div class="ticket ${m.status==='cooked'?'':'cooked'}" style="opacity:1" onclick="openRecipe('${m.rid}','${m.date}')">
+        <div class="datebox"><div class="dow">${DOW[d.getDay()]}</div><div class="dom">${d.getDate()}</div></div>
+        <div class="body">
+          <div class="title" style="text-decoration:none">${esc(r.title)}</div>
+          <div class="tagrow"><span class="tag ${r.tag}">${r.tag}</span>
+            ${m.rid.startsWith('my-')?'<span class="tag mine">yours</span>':''}
+            ${m.status!=='cooked'?'<span class="tag" style="background:#EEE;color:var(--ink-soft);border:1px solid var(--line)">skipped</span>':''}</div>
+        </div>
+        <div class="chev">›</div>
+      </div>`;
+    });
+  });
+  el.innerHTML=html;
+}
+function keepRecipe(rid){
+  const r=getRecipe(rid); if(!r) return;
+  const nid='my-'+Date.now();
+  state.recipes[nid]=JSON.parse(JSON.stringify(r));
+  save();
+  currentRecipe={rid:nid, date:null};
+  renderRecipe();
+}
+
 /* ====================== RECIPE SCREEN ====================== */
 const TARGET_SERVES=3;
 let servTarget=TARGET_SERVES, scale=1;
 function openRecipe(rid,date){
-  recipeReturn = document.getElementById('scr-recipes').classList.contains('active') ? 'recipes' : 'plan';
+  recipeReturn = document.getElementById('scr-recipes').classList.contains('active') ? 'recipes'
+               : document.getElementById('scr-archive').classList.contains('active') ? 'archive' : 'plan';
   currentRecipe={rid,date}; servTarget=TARGET_SERVES;
   renderRecipe(); showTab('recipe');
 }
@@ -788,9 +841,11 @@ function renderRecipe(){
    </div>
    <div class="btn-row" style="margin:12px 0">
      <button class="btn primary" style="flex:1" onclick="startCook()">▶ Start cooking</button>
-     ${currentRecipe.date
+     ${currentRecipe.date && currentRecipe.date >= todayISO()
        ?`<button class="btn ghost" onclick="openMealFeedback('${currentRecipe.date}')">Adjust</button>`
        :`<button class="btn ghost" onclick="openPlanPicker('${currentRecipe.rid}')">Add to plan</button>`}
+     ${!mine && currentRecipe.date && currentRecipe.date < todayISO()
+       ?`<button class="btn ghost" onclick="keepRecipe('${currentRecipe.rid}')">📖 Keep</button>`:''}
    </div>
    <div class="card">
      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
