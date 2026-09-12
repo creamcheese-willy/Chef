@@ -270,6 +270,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
         <li>Shopping happens Sunday: fish first, then chicken, then other meats (frozen early, thawed midweek).</li>
         <li>One hearty vegetarian meal most weeks — chickpeas, sweet potatoes, beans.</li>
         <li>Share perishables across the week: a bunch of scallions, one herb bunch, limes, etc.</li>
+        <li>Short lists are a feature: ~10 ingredients max per dinner, ~20 lines per weekly shop. Flavor comes from technique and a few high-impact items, not long lists.</li>
         <li>Recipes saved to the box get first consideration when they fit the week.</li>
         <li>Health-conscious but delicious-first.</li>
       </ul>
@@ -962,8 +963,8 @@ function hardReset(){ if(confirm('Reset all app data on this device?')){ localSt
 
 /* ====================== THE CHEF (Claude API) ====================== */
 let chefContext=null; // null = global; or {date} for one meal
-const QUICK_GLOBAL=['Bolder, brighter flavors','Lean on TJ\u2019s shortcuts','Lighter this week','More vegetarian','Faster weeknight meals','Use up our surplus','Use our saved recipes','Surprise us'];
-const QUICK_MEAL=['Doesn\u2019t sound good — swap it','Too plain — more flavor','Different protein','Lighter','Faster','Use what we have','Something from our box'];
+const QUICK_GLOBAL=['Simpler — shorter shopping list','Bolder, brighter flavors','Lean on TJ\u2019s shortcuts','Lighter this week','More vegetarian','Faster weeknight meals','Use up our surplus','Use our saved recipes','Surprise us'];
+const QUICK_MEAL=['Doesn\u2019t sound good — swap it','Too fussy — fewer ingredients','Too plain — more flavor','Different protein','Lighter','Faster','Use what we have','Something from our box'];
 
 function openChef(){ chefContext=null; openSheet('Direct the chef','Tell it anything — swap meals, ban an ingredient, shift the whole plan.',QUICK_GLOBAL); }
 function openMealFeedback(date){
@@ -995,9 +996,15 @@ function chefSystemPrompt(){
 - Most weeks include one hearty, protein-rich vegetarian dinner (chickpeas, sweet potatoes, beans, etc.).
 - Be efficient with groceries: shared perishables (a scallion bunch, one herb bunch, limes) should be used across multiple meals in the same week; avoid buying an ingredient one meal uses a tiny amount of unless others share it.
 - Health-conscious but delicious-first.
+Ingredient economy — hard limits, not suggestions:
+- Each recipe: at most 10 ingredient lines TOTAL, and at most 6 that need buying (non-staple). Fewer is better.
+- Across a week: the combined shopping list for all four dinners should land around 18–22 lines including proteins. Before finalizing a week, mentally merge the lists; if it runs long, cut ingredients or swap a meal.
+- Every perishable bought must earn its place: used across 2+ meals that week, or used up entirely in one.
+- Bold flavor does NOT mean many ingredients. Concentrate, don't accumulate: one high-impact item (a jarred sauce, curry paste, chili crisp, a good sausage) beats five supporting ingredients; technique — hard sears, charring, blooming spices in fat, a pan sauce from the fond — is flavor that costs nothing at the store. A great weeknight dish is 6–8 ingredients cooked with conviction.
+- Skip garnish-only purchases: no buying an herb, nut, or dairy item for a single sprinkle unless another meal shares it.
 Flavor doctrine — the most common failure mode is blandness; avoid it aggressively:
 - Every dinner cooks from a specific cuisine or dish tradition (name it in "desc"), never a generic protein-veg-starch formula. Vary traditions across the week; don't lean on the same flavor profile twice in one week or repeat anything in recentMeals.
-- Build contrast into every plate: rich needs acid (citrus, vinegar, pickled things), soft needs crunch, and nearly everything needs a finishing element — fresh herbs, toasted nuts, quick-pickled onion, chili crisp, a sauce.
+- Build contrast into every plate: rich needs acid, soft needs crunch. But finishing elements must come from what's already in the basket or pantry (the lime already bought, scallion tops, toasted breadcrumbs, a drizzle of the jar sauce) — never a new purchase for one flourish.
 - Season assertively: garlic, ginger, and chiles in real quantities; spices bloomed in fat; marinades when time allows; salt at every stage. Timid seasoning is a bug, not caution.
 - Prefer high-flavor techniques: hard sears, charring, caramelization, pan sauces and glazes — over plain roasting or steaming.
 - The user's tasteProfile in context is the definition of delicious for this household; it overrides these defaults where they conflict.
