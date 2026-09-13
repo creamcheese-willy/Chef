@@ -172,6 +172,10 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .spin{display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:rot .7s linear infinite}
 @keyframes rot{to{transform:rotate(360deg)}}
 .err{background:#FBE9E7; border:1px solid #C6564A; color:#7C2D24; border-radius:12px; padding:10px 12px; font-size:.86rem; margin-top:10px}
+.vrow{display:flex; align-items:center; gap:8px; background:#FCFCFA; border:1px solid var(--line); border-radius:12px; padding:9px 10px; margin-bottom:8px}
+.vrow .vt{flex:1; font-size:.9rem; font-weight:500; min-width:0}
+.vbtn{border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:1.05rem; background:#fff; opacity:.55}
+.vbtn.on{opacity:1; background:var(--beet-soft); border-color:var(--beet)}
 .slotbtn{display:flex; width:100%; align-items:center; justify-content:flex-start; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-weight:600; font-size:.92rem}
 .slotbtn:active{background:var(--beet-soft)}
@@ -328,6 +332,18 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
     <button class="btn primary full" id="add-save" onclick="importRecipe()">Save to recipe box</button>
   </div>
   <div id="add-out"></div>
+</div>
+
+<!-- Week review sheet -->
+<div class="sheet" id="review-sheet">
+  <h3 id="review-title">How was the week?</h3>
+  <p class="hint">Rate each meal, add anything else worth knowing, and the chef plans the next week with it all in mind. Meals you loved get kept in your recipe box automatically.</p>
+  <div id="review-meals"></div>
+  <textarea id="review-text" placeholder="e.g. Tuesday was a hit but too spicy for a weeknight. We never got to Saturday's."></textarea>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="btn primary full" id="review-send" onclick="sendReview()">Send & plan the next week</button>
+  </div>
+  <div id="review-out"></div>
 </div>
 
 <!-- Plan-picker sheet -->
@@ -607,6 +623,10 @@ function renderPlan(){
   const suns=horizonSundays();
   const t=todayISO();
   let html='';
+  const rv=reviewableWeek();
+  if(rv){
+    html+=`<button class="btn ghost full" style="margin-bottom:12px" onclick="openReview('${rv}')">⭐ How was the week of ${fmtShort(pd(rv))}? Review & plan ahead</button>`;
+  }
   suns.forEach((sun,i)=>{
     const end=new Date(pd(sun)); end.setDate(end.getDate()+6);
     const meals=state.plan.filter(p=>weekKeyOf(p.date)===sun).sort((a,b)=>a.date<b.date?-1:1);
@@ -798,6 +818,8 @@ function renderArchive(){
         <div class="body">
           <div class="title" style="text-decoration:none">${esc(r.title)}</div>
           <div class="tagrow"><span class="tag ${r.tag}">${r.tag}</span>
+            ${m.verdict==='loved'?'<span class="tag mine">👍 loved</span>':''}
+            ${m.verdict==='not_again'?'<span class="tag" style="background:#FBE9E7;color:#7C2D24;border:1px solid #C6564A">👎 not again</span>':''}
             ${m.rid.startsWith('my-')?'<span class="tag mine">yours</span>':''}
             ${m.status!=='cooked'?'<span class="tag" style="background:#EEE;color:var(--ink-soft);border:1px solid var(--line)">skipped</span>':''}</div>
         </div>
@@ -932,6 +954,17 @@ function beep(){
 }
 
 /* ====================== GROCERIES ====================== */
+/* Reduce an ingredient name to its base item so "limes, juiced", "lime wedges",
+   and "limes (divided)" all merge into one line. */
+function gKey(name){
+  let n=String(name).toLowerCase();
+  n=n.replace(/\(.*?\)/g,' ');   // drop parentheticals
+  n=n.split(',')[0];             // drop prep after the comma
+  n=n.replace(/\b(fresh|large|small|medium|ripe|baby|boneless|skinless|ground|dried|frozen|thawed|thinly|thickly|roughly|finely|sliced|diced|minced|grated|zested|juiced|chopped|shredded|torn|trimmed|peeled|deveined|drained|patted|dry|cut|into|in|wedges?|halves?|half-moons?|florets?|pieces?|strips?|kernels?|off|for|serving|garnish|divided|and|or|the|a)\b/g,' ');
+  n=n.replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+  n=n.replace(/ies$/,'y').replace(/oes$/,'o').replace(/([^s])s$/,'$1'); // singularize
+  return n;
+}
 function renderGrocery(){
   const suns=horizonSundays();
   if(!currentGWeek || !suns.includes(currentGWeek)) currentGWeek=suns[0];
@@ -946,8 +979,8 @@ function renderGrocery(){
     const mult=TARGET_SERVES/(r.serves||2); // scale each recipe's shopping amounts to three servings
     r.ingredients.forEach(g=>{
       if(/optional/i.test(g.name)) return;
-      const key=(g.name.toLowerCase().split(',')[0].trim().replace(/s$/,''))+'|'+(g.unit||'');
-      if(!agg[key]) agg[key]={amount:0,unit:g.unit,name:g.name.split(',')[0].trim(),cat:g.staple?'staple':g.cat,for:[]};
+      const key=gKey(g.name)+'|'+(g.unit||'');
+      if(!agg[key]) agg[key]={amount:0,unit:g.unit,name:g.name.replace(/\(.*?\)/g,'').split(',')[0].trim(),cat:g.staple?'staple':g.cat,for:[]};
       agg[key].amount+= (g.amount||0)*mult;
       if(!agg[key].for.includes(r.title)) agg[key].for.push(r.title);
     });
@@ -961,8 +994,10 @@ function renderGrocery(){
     html+=`<div class="gcat">${label}</div>`;
     items.sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([k,v])=>{
       const done=!!checks[k];
+      let disp=v.name;
+      if(!v.unit && v.amount>1 && !/s$/i.test(disp)) disp+='s'; // 4 limes, not 4 lime
       html+=`<label class="gitem ${done?'done':''}"><input type="checkbox" ${done?'checked':''} onchange="gCheck('${k.replace(/'/g,"\\'")}',this.checked)">
-        <span><span class="gname"><b>${fmtGAmt(v.amount)}${v.unit?' '+v.unit:''}</b> ${esc(v.name)}</span>
+        <span><span class="gname"><b>${fmtGAmt(v.amount)}${v.unit?' '+v.unit:''}</b> ${esc(disp)}</span>
         <span class="gfor">for: ${v.for.map(esc).join(' · ')}</span></span></label>`;
     });
   });
@@ -1000,6 +1035,105 @@ function addSurplus(){
   state.surplus.push({name:v}); el.value=''; save(); renderIngredients();
 }
 function rmSurplus(i){ state.surplus.splice(i,1); save(); renderIngredients(); }
+
+/* ====================== WEEK REVIEW ====================== */
+let reviewWeek=null, reviewVerdicts={};
+function reviewableWeek(){
+  // Latest week with at least one meal cooked or past, and not yet fully reviewed
+  const t=todayISO();
+  const wks={};
+  state.plan.forEach(p=>{ if(p.status==='cooked'||p.date<t){ const wk=weekKeyOf(p.date); (wks[wk]=wks[wk]||[]).push(p); } });
+  const keys=Object.keys(wks).sort((a,b)=>b.localeCompare(a));
+  for(const wk of keys){ if(wks[wk].some(p=>!p.verdict)) return wk; }
+  return null;
+}
+function openReview(wk){
+  reviewWeek=wk; reviewVerdicts={};
+  const t=todayISO();
+  const meals=state.plan.filter(p=>weekKeyOf(p.date)===wk && (p.status==='cooked'||p.date<t)).sort((a,b)=>a.date.localeCompare(b.date));
+  meals.forEach(m=>{ reviewVerdicts[m.date]=m.verdict||'fine'; });
+  document.getElementById('review-title').textContent='How was the week of '+fmtShort(pd(wk))+'?';
+  document.getElementById('review-meals').innerHTML=meals.map(m=>{
+    const r=getRecipe(m.rid)||{title:'(missing recipe)'};
+    return `<div class="vrow"><span class="vt">${esc(r.title)}</span>
+      ${[['loved','👍'],['fine','😐'],['not_again','👎']].map(([v,e])=>
+        `<button class="vbtn ${reviewVerdicts[m.date]===v?'on':''}" id="vb-${m.date}-${v}" onclick="setVerdict('${m.date}','${v}')">${e}</button>`).join('')}
+    </div>`;
+  }).join('') || '<p class="section-note">No cooked meals found in that week.</p>';
+  document.getElementById('review-text').value='';
+  document.getElementById('review-out').innerHTML='';
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('review-sheet').classList.add('open');
+}
+function setVerdict(date,v){
+  reviewVerdicts[date]=v;
+  ['loved','fine','not_again'].forEach(x=>{
+    const b=document.getElementById('vb-'+date+'-'+x); if(b) b.classList.toggle('on', x===v);
+  });
+}
+async function sendReview(){
+  const out=document.getElementById('review-out');
+  const notes=document.getElementById('review-text').value.trim();
+  // Persist verdicts onto the plan, and promote loved chef dishes into the recipe box
+  const promoted=[];
+  Object.entries(reviewVerdicts).forEach(([date,v])=>{
+    const m=state.plan.find(p=>p.date===date); if(!m) return;
+    m.verdict=v;
+    if(v==='loved' && m.rid.startsWith('ai-')){
+      const nid='my-'+Date.now()+Math.random().toString(36).slice(2,6);
+      state.recipes[nid]=JSON.parse(JSON.stringify(getRecipe(m.rid)));
+      m.rid=nid; promoted.push(state.recipes[nid].title);
+    }
+  });
+  save();
+  if(!state.apiKey){
+    if(notes) state.prefs.push(notes);
+    save();
+    out.innerHTML='<div class="chef-reply">Feedback saved'+(promoted.length?'; kept '+promoted.length+' favorite'+(promoted.length>1?'s':'')+' in your box':'')+'. Add your API key in Settings for the chef to plan next week from it.</div>';
+    renderPlan(); return;
+  }
+  const btn=document.getElementById('review-send');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Planning…'; out.innerHTML='';
+  try{
+    // Target: first horizon week with nothing planned; otherwise revise the next week
+    const suns=horizonSundays();
+    let target=suns.find(s=> !state.plan.some(p=>weekKeyOf(p.date)===s));
+    let targetDates;
+    if(target){
+      targetDates=[0,2,4,6].map(off=>{ const d=new Date(pd(target)); d.setDate(d.getDate()+off); return iso(d); });
+    } else {
+      target=suns[0]===weekKeyOf(reviewWeek)?suns[1]:suns[0];
+      const t=todayISO();
+      targetDates=state.plan.filter(p=>weekKeyOf(p.date)===target && p.status!=='cooked' && p.date>=t).map(p=>p.date).sort();
+    }
+    const verdictList=Object.entries(reviewVerdicts).map(([date,v])=>{
+      const m=state.plan.find(p=>p.date===date); const r=m?getRecipe(m.rid):null;
+      return {meal:(r||{}).title, tag:(r||{}).tag, verdict:v};
+    });
+    const result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+The user reviewed the week of ${reviewWeek}. Meal verdicts: ${JSON.stringify(verdictList)}. Additional notes: "${notes||'none'}".
+1) From clear patterns in the verdicts and notes, derive up to two SHORT standing preferences worth remembering (or none — do not invent weak ones).
+2) Plan dinners for these dates: ${targetDates.join(', ')} (they replace anything currently planned there). Build directly on the feedback: lean toward what was loved (repeating or riffing on a loved dish is welcome — loved dishes are now in savedRecipes), steer away from what didn't work, and honor the notes. Follow every house rule, especially the ingredient-economy limits.
+Return JSON: {"reply": 1-2 friendly sentences tying the new week to their feedback, "newPreferences": [str] or [], "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
+    (result.meals||[]).forEach(mm=>{
+      const ex=state.plan.find(p=>p.date===mm.date);
+      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe);
+      if(!rid) return;
+      if(ex){ if(ex.status!=='cooked'){ ex.rid=rid; ex.status='planned'; } }
+      else state.plan.push({date:mm.date, rid, status:'planned'});
+    });
+    (result.newPreferences||[]).forEach(p=>{ if(p) state.prefs.push(p); });
+    save();
+    out.innerHTML=`<div class="chef-reply">👩‍🍳 ${esc(result.reply||'Next week is planned around your feedback.')}${promoted.length?'<br>📖 Kept in your box: '+promoted.map(esc).join(', '):''}</div>`;
+    renderPlan();
+    setTimeout(closeSheets, 2600);
+  }catch(e){
+    out.innerHTML=`<div class="err">The chef couldn\u2019t plan from this: ${esc(e.message)}. Your ratings are saved — try sending again.</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Send & plan the next week';
+  }
+}
 
 /* ====================== SETTINGS ====================== */
 function renderSettings(){
@@ -1047,7 +1181,7 @@ function openSheet(title,hint,quick){
 }
 function closeSheets(){
   document.getElementById('sheet-mask').classList.remove('open');
-  ['chef-sheet','add-sheet','plan-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  ['chef-sheet','add-sheet','plan-sheet','review-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
 }
 function closeChef(){ closeSheets(); }
 
@@ -1084,7 +1218,7 @@ function contextPayload(){
     .map(p=>({date:p.date, status:p.status, recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
   const recentMeals = state.plan.filter(p=> p.status==='cooked' || p.date < todayISO())
     .sort((a,b)=> b.date.localeCompare(a.date)).slice(0,12)
-    .map(p=>({recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
+    .map(p=>({recipe:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag, verdict:p.verdict||null}));
   return { today: todayISO(), plan: horizon, recentMeals, tasteProfile: state.taste||'', shoppingStore: state.store||'tj', savedRecipes: savedRecipeList(), featuredSeasonal: state.featured, surplusAtHome: state.surplus.map(s=>s.name), standingPreferences: state.prefs };
 }
 const RECIPE_SCHEMA=`{"title":str,"serves":3,"tag":"fish|chicken|veg|beef|pork","frozen":bool,"desc":str,"ingredients":[{"amount":num,"unit":"lb|cup|tbsp|tsp|oz|pint|can|'' (empty for countable)","name":str,"cat":"produce|protein|pantry","staple":bool}],"steps":[{"title":str,"content":str,"timerSeconds":num|null}],"notes":str}`;
