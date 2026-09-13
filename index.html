@@ -566,12 +566,19 @@ function todayISO(){ return iso(new Date()); }
 /* Keep a rolling 3-week horizon: as weeks pass, ask the chef (or seed a placeholder) for new weeks */
 function horizonSundays(){
   let s0=sundayOf(new Date());
-  // If this calendar week has nothing planned but a later week does, start the horizon there
+  // Roll forward past the current week if it has nothing planned (but later weeks do),
+  // or if it's finished — every meal cooked or already in the past.
   const thisWk=iso(s0);
   const hasThisWeek=state.plan.some(p=>weekKeyOf(p.date)===thisWk);
   const hasLater=state.plan.some(p=>weekKeyOf(p.date)>thisWk);
-  if(!hasThisWeek && hasLater){ s0=new Date(s0); s0.setDate(s0.getDate()+7); }
+  if((!hasThisWeek && hasLater) || weekDone(thisWk)){ s0=new Date(s0); s0.setDate(s0.getDate()+7); }
   return [0,7,14].map(off=>{ const d=new Date(s0); d.setDate(d.getDate()+off); return iso(d); });
+}
+function weekDone(sunKey){
+  const meals=state.plan.filter(p=>weekKeyOf(p.date)===sunKey);
+  if(!meals.length) return false;
+  const t=todayISO();
+  return meals.every(m=> m.status==='cooked' || m.date < t);
 }
 function weekKeyOf(dateStr){ return iso(sundayOf(pd(dateStr))); }
 
@@ -603,7 +610,8 @@ function renderPlan(){
   suns.forEach((sun,i)=>{
     const end=new Date(pd(sun)); end.setDate(end.getDate()+6);
     const meals=state.plan.filter(p=>weekKeyOf(p.date)===sun).sort((a,b)=>a.date<b.date?-1:1);
-    html+=`<div class="week-label"><span>${i===0?'This week':i===1?'Next week':'Week after'}</span><span class="range">${fmtShort(pd(sun))} – ${fmtShort(end)}</span></div>`;
+    const hasUpcoming=meals.some(m=>m.status!=='cooked' && m.date>=t);
+    html+=`<div class="week-label"><span>${i===0?'This week':i===1?'Next week':'Week after'}</span><span class="range">${fmtShort(pd(sun))} – ${fmtShort(end)}${hasUpcoming?` <button style="color:var(--beet);font-weight:700;margin-left:6px" onclick="replanWeek('${sun}')">↻ replan</button>`:''}</span></div>`;
     if(!meals.length){
       html+=`<div class="ticket"><div class="body"><div class="title">Nothing planned yet</div><div class="sub">Ask the chef to fill this week, or it will fill as the horizon rolls forward.</div><div class="tagrow"><button class="btn small primary" onclick="fillWeek('${sun}')">Plan this week</button></div></div></div>`;
       return;
@@ -1160,6 +1168,28 @@ Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing p
   }finally{
     btn.disabled=false; btn.textContent='Send to chef';
   }
+}
+
+async function replanWeek(sunday){
+  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to replan weeks.'); return; }
+  const t=todayISO();
+  const targets=state.plan.filter(p=>weekKeyOf(p.date)===sunday && p.status!=='cooked' && p.date>=t).map(p=>p.date).sort();
+  if(!targets.length){ alert('Nothing upcoming to replan in that week.'); return; }
+  if(!confirm('Replan '+targets.length+' upcoming meal'+(targets.length>1?'s':'')+' in this week from scratch?')) return;
+  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='replanning…'; }
+  try{
+    const result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+Replan these upcoming dates from scratch, replacing what is currently planned on them: ${targets.join(', ')}. Design a fresh, cohesive set for that week that follows every house rule — especially the ingredient-economy limits (at most ~10 ingredients per dish, ~18–22 shopping lines for the week). Share perishables across the new meals and any already-cooked ones that week; keep each date's perishability slot sensible; prefer saved recipes where they fit.
+Return JSON: {"reply": one sentence on the new direction, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
+    (result.meals||[]).forEach(mm=>{
+      const m=state.plan.find(p=>p.date===mm.date);
+      if(!m || m.status==='cooked') return;
+      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe);
+      if(rid){ m.rid=rid; m.status='planned'; }
+    });
+    save(); renderPlan();
+  }catch(e){ alert('Could not replan: '+e.message); renderPlan(); }
 }
 
 async function fillWeek(sunday){
