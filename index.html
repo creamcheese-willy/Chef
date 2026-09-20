@@ -1209,17 +1209,13 @@ async function sendReview(){
   const btn=document.getElementById('review-send');
   btn.disabled=true; btn.innerHTML='<span class="spin"></span> Planning…'; out.innerHTML='';
   try{
-    // Target: first horizon week with nothing planned; otherwise revise the next week
+    // Target: the first horizon week that still needs meals (has open nights);
+    // if every week is fully planned, revise the nearest upcoming one.
     const suns=horizonSundays();
-    let target=suns.find(s=> !state.plan.some(p=>weekKeyOf(p.date)===s));
-    let targetDates;
-    if(target){
-      targetDates=[0,2,4,6].map(off=>{ const d=new Date(pd(target)); d.setDate(d.getDate()+off); return iso(d); });
-    } else {
-      target=suns[0]===weekKeyOf(reviewWeek)?suns[1]:suns[0];
-      const t=todayISO();
-      targetDates=state.plan.filter(p=>weekKeyOf(p.date)===target && p.status!=='cooked' && p.date>=t).map(p=>p.date).sort();
-    }
+    let target=null, targetDates=[];
+    for(const s of suns){ const w=weekTargets(s); if(w.open>0 && w.targets.length){ target=s; targetDates=w.targets; break; } }
+    if(!target){ for(const s of suns){ const w=weekTargets(s); if(w.targets.length){ target=s; targetDates=w.targets; break; } } }
+    if(!target) throw new Error('no upcoming nights to plan');
     const verdictList=Object.entries(reviewVerdicts).map(([date,v])=>{
       const m=state.plan.find(p=>p.date===date); const r=m?getRecipe(m.rid):null;
       return {meal:(r||{}).title, tag:(r||{}).tag, verdict:v};
