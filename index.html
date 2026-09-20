@@ -233,6 +233,10 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
       <button class="btn ghost small" onclick="resetGroceryChecks()">Clear checks</button>
     </div>
     <div id="grocery-list"></div>
+    <div class="addrow">
+      <input id="gx-in" placeholder="Anything else — paper towels, coffee…" enterkeyhint="done">
+      <button class="btn primary small" onclick="addGroceryExtra()">Add</button>
+    </div>
   </section>
 
   <!-- INGREDIENTS -->
@@ -580,9 +584,9 @@ function defaultPlan(){
 let state = load();
 function load(){
   try{ const s = JSON.parse(localStorage.getItem(LS_KEY)); if(s && s.plan) return migrate(s); }catch(e){}
-  return { plan: defaultPlan(), recipes: {}, featured: [], surplus: [], prefs: [], gchecks: {}, apiKey:'', taste:'', store:'tj' };
+  return { plan: defaultPlan(), recipes: {}, featured: [], surplus: [], prefs: [], gchecks: {}, gextra: {}, apiKey:'', taste:'', store:'tj' };
 }
-function migrate(s){ s.recipes=s.recipes||{}; s.featured=s.featured||[]; s.surplus=s.surplus||[]; s.prefs=s.prefs||[]; s.gchecks=s.gchecks||{}; s.taste=s.taste||''; s.store=s.store||'tj'; return s; }
+function migrate(s){ s.recipes=s.recipes||{}; s.featured=s.featured||[]; s.surplus=s.surplus||[]; s.prefs=s.prefs||[]; s.gchecks=s.gchecks||{}; s.gextra=s.gextra||{}; s.taste=s.taste||''; s.store=s.store||'tj'; return s; }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 function getRecipe(rid){ return state.recipes[rid] || SEED_RECIPES[rid]; }
 
@@ -1033,7 +1037,31 @@ function renderGrocery(){
         <span class="gfor">for: ${v.for.map(esc).join(' · ')}</span></span></label>`;
     });
   });
+  const extras=state.gextra[currentGWeek]||[];
+  if(extras.length){
+    html+=`<div class="gcat">Also picking up</div>`;
+    extras.forEach((name,i)=>{
+      const key='x|'+name.toLowerCase();
+      const done=!!checks[key];
+      html+=`<label class="gitem ${done?'done':''}"><input type="checkbox" ${done?'checked':''} onchange="gCheck('${key.replace(/'/g,"\\'")}',this.checked)">
+        <span style="flex:1"><span class="gname">${esc(name)}</span></span>
+        <button style="color:var(--beet);font-weight:700;padding:2px 6px" onclick="event.preventDefault(); rmGroceryExtra(${i})">✕</button></label>`;
+    });
+  }
   document.getElementById('grocery-list').innerHTML = html || '<p class="section-note">No meals planned for this week yet.</p>';
+}
+function addGroceryExtra(){
+  const el=document.getElementById('gx-in'); const v=el.value.trim(); if(!v) return;
+  const list=state.gextra[currentGWeek]=state.gextra[currentGWeek]||[];
+  if(!list.some(x=>x.toLowerCase()===v.toLowerCase())) list.push(v);
+  el.value=''; save(); renderGrocery();
+}
+function rmGroceryExtra(i){
+  const list=state.gextra[currentGWeek]||[];
+  const name=list[i];
+  list.splice(i,1);
+  if(name && state.gchecks[currentGWeek]) delete state.gchecks[currentGWeek]['x|'+name.toLowerCase()];
+  save(); renderGrocery();
 }
 function fmtGAmt(a){ if(!a) return ''; let v=a; if(v>=0.2) v=Math.round(v*4)/4; return (Math.round(v*100)/100).toString(); }
 function gCheck(key,val){ state.gchecks[currentGWeek]=state.gchecks[currentGWeek]||{}; state.gchecks[currentGWeek][key]=val; save(); renderGrocery(); }
@@ -1390,25 +1418,29 @@ Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing p
   }
 }
 
-async function replanWeek(sunday){
-  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to plan weeks.'); return; }
+/* Which dates a week needs planned: upcoming standard slots plus existing planned
+   meals (which replace in place); an off-schedule meal absorbs its nearest slot. */
+function weekTargets(sunday){
   const t=todayISO();
   const wkMeals=state.plan.filter(p=>weekKeyOf(p.date)===sunday);
   const replaceable=wkMeals.filter(p=>p.status!=='cooked' && p.date>=t).map(p=>p.date);
   const slots=[0,2,4,6].map(off=>{ const d=new Date(pd(sunday)); d.setDate(d.getDate()+off); return iso(d); });
   const pool=new Set(slots.filter(ds=> ds>=t && !wkMeals.some(p=>p.date===ds)));
-  // An existing meal on an off-schedule night absorbs its nearest standard slot,
-  // so the week still totals four dinners.
   replaceable.forEach(ds=>{
     if(slots.includes(ds)) return;
     let best=null, bd=99;
     pool.forEach(s=>{ const d=Math.abs((pd(s)-pd(ds))/86400000); if(d<bd || (d===bd && s>best)){ bd=d; best=s; } });
     if(best!==null && bd<=2) pool.delete(best);
   });
-  const targets=[...new Set([...replaceable,...pool])].sort();
+  return { targets:[...new Set([...replaceable,...pool])].sort(), open:pool.size, replacing:replaceable.length };
+}
+
+async function replanWeek(sunday){
+  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to plan weeks.'); return; }
+  const {targets, replacing}=weekTargets(sunday);
   if(!targets.length){ alert('Nothing upcoming to plan in that week.'); return; }
   const msg='Plan '+targets.length+' dinner'+(targets.length>1?'s':'')+' for this week'
-    +(replaceable.length?' — '+replaceable.length+' already planned will be replaced'
+    +(replacing?' — '+replacing+' already planned will be replaced'
     :'')+'?';
   if(!confirm(msg)) return;
   const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='planning…'; }
@@ -1430,6 +1462,7 @@ Return JSON: {"reply": one sentence on the week's direction, "meals":[{"date":"Y
 /* ====================== INIT ====================== */
 (function init(){
   document.getElementById('surp-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addSurplus(); });
+  document.getElementById('gx-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addGroceryExtra(); });
   renderPlan();
 })();
 </script>
