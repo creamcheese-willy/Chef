@@ -176,6 +176,10 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .vrow .vt{flex:1; font-size:.9rem; font-weight:500; min-width:0}
 .vbtn{border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:1.05rem; background:#fff; opacity:.55}
 .vbtn.on{opacity:1; background:var(--beet-soft); border-color:var(--beet)}
+#upd-banner{position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:12px; right:12px; z-index:200;
+  background:var(--ink); color:#F4F6EE; border-radius:12px; padding:12px 14px; font-weight:600; font-size:.9rem;
+  text-align:center; box-shadow:0 6px 18px rgba(20,24,16,.3); display:none; cursor:pointer}
+#upd-banner.show{display:block}
 .slotbtn{display:flex; width:100%; align-items:center; justify-content:flex-start; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-weight:600; font-size:.92rem}
 .slotbtn:active{background:var(--beet-soft)}
@@ -294,6 +298,11 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
       </ul>
     </div>
     <div class="card set-block">
+      <h3 style="margin-top:0">App version</h3>
+      <p class="muted">Version <b id="ver-cur"></b>. The app checks GitHub for a newer build each time it opens; a banner appears when one is ready.</p>
+      <button class="btn ghost small" onclick="checkForUpdate(true)">Check for updates</button> <span id="ver-status" class="muted"></span>
+    </div>
+    <div class="card set-block">
       <button class="btn ghost small" onclick="hardReset()">Reset app data</button>
       <p class="muted" style="margin-top:8px">Clears plans, checks, saved recipes, features and surplus on this device.</p>
     </div>
@@ -301,6 +310,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 </div>
 
 <button class="fab show" id="chef-fab" onclick="openChef()">👩‍🍳 Chef</button>
+<div id="upd-banner" onclick="applyUpdate()">🔄 A new version is ready — tap to update</div>
 
 <nav class="tabs">
   <button id="tab-plan" class="active" onclick="showTab('plan')"><span class="ic">🗓️</span>Plan</button>
@@ -398,6 +408,9 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 </div>
 
 <script>
+/* ====================== VERSION ====================== */
+const APP_VERSION=15; // bumped with every release; the update checker compares this against GitHub
+
 /* ====================== DATA LAYER ====================== */
 const LS_KEY = 'dinner-app-v1';
 function I(amount, unit, name, cat, staple){ return {amount, unit, name, cat, staple: !!staple}; }
@@ -1260,6 +1273,7 @@ Return JSON: {"reply": 1-2 friendly sentences tying the new week to their feedba
 /* ====================== SETTINGS ====================== */
 function renderSettings(){
   document.getElementById('apikey').value = state.apiKey||'';
+  document.getElementById('ver-cur').textContent = APP_VERSION;
   document.getElementById('taste').value = state.taste||'';
   document.getElementById('store').value = state.store||'tj';
   document.getElementById('prefs-list').innerHTML = state.prefs.length
@@ -1528,11 +1542,34 @@ Return JSON: {"reply": one sentence on the week's direction, "meals":[{"date":"Y
   return result;
 }
 
+/* ====================== UPDATE CHECK ====================== */
+let updAvailable=false;
+async function checkForUpdate(manual){
+  const st=document.getElementById('ver-status');
+  if(manual && st) st.textContent='Checking…';
+  try{
+    const res=await fetch(location.pathname+'?chk='+Date.now(), {cache:'no-store'});
+    const txt=await res.text();
+    const mm=txt.match(/APP_VERSION\s*=\s*(\d+)/);
+    const remote=mm?parseInt(mm[1],10):0;
+    if(remote>APP_VERSION){
+      updAvailable=true;
+      document.getElementById('upd-banner').classList.add('show');
+      if(manual && st) st.textContent='Version '+remote+' is ready — tap the banner at the top to update.';
+    } else if(manual && st){ st.textContent='You\u2019re up to date ✓'; }
+  }catch(e){
+    if(manual && st) st.textContent='Couldn\u2019t check — are you online?';
+  }
+}
+function applyUpdate(){ location.replace(location.pathname+'?u='+Date.now()); }
+
 /* ====================== INIT ====================== */
 (function init(){
   document.getElementById('surp-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addSurplus(); });
   document.getElementById('gx-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addGroceryExtra(); });
   renderPlan();
+  setTimeout(()=>checkForUpdate(false), 1500);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && !updAvailable) checkForUpdate(false); });
 })();
 </script>
 </body>
