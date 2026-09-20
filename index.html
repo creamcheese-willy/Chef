@@ -340,6 +340,18 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
   <div id="add-out"></div>
 </div>
 
+<!-- Replan-with-holds sheet -->
+<div class="sheet" id="replan-sheet">
+  <h3>Replan the week</h3>
+  <p class="hint">Tap to hold onto any meal you like — everything left on "replace" gets replanned around it, and open nights get filled in.</p>
+  <div id="replan-meals"></div>
+  <p class="section-note" id="replan-open" style="margin-top:4px"></p>
+  <div class="btn-row" style="margin-top:8px">
+    <button class="btn primary full" id="replan-send" onclick="doReplan()">Replan</button>
+  </div>
+  <div id="replan-out"></div>
+</div>
+
 <!-- One-off dinner sheet -->
 <div class="sheet" id="oneoff-sheet">
   <h3>Plan one dinner</h3>
@@ -1291,7 +1303,7 @@ function openSheet(title,hint,quick){
 }
 function closeSheets(){
   document.getElementById('sheet-mask').classList.remove('open');
-  ['chef-sheet','add-sheet','plan-sheet','review-sheet','oneoff-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  ['chef-sheet','add-sheet','plan-sheet','review-sheet','oneoff-sheet','replan-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
 }
 function closeChef(){ closeSheets(); }
 
@@ -1416,13 +1428,17 @@ Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing p
 
 /* Which dates a week needs planned: upcoming standard slots plus existing planned
    meals (which replace in place); an off-schedule meal absorbs its nearest slot. */
-function weekTargets(sunday){
+function weekTargets(sunday, hold){
+  hold=hold||[];
   const t=todayISO();
   const wkMeals=state.plan.filter(p=>weekKeyOf(p.date)===sunday);
-  const replaceable=wkMeals.filter(p=>p.status!=='cooked' && p.date>=t).map(p=>p.date);
+  const upcoming=wkMeals.filter(p=>p.status!=='cooked' && p.date>=t);
+  const replaceable=upcoming.filter(p=>!hold.includes(p.date)).map(p=>p.date);
   const slots=[0,2,4,6].map(off=>{ const d=new Date(pd(sunday)); d.setDate(d.getDate()+off); return iso(d); });
   const pool=new Set(slots.filter(ds=> ds>=t && !wkMeals.some(p=>p.date===ds)));
-  replaceable.forEach(ds=>{
+  // Any upcoming meal on an off-schedule night (kept or not) absorbs its nearest
+  // standard slot, so the week still totals four dinners.
+  upcoming.map(p=>p.date).forEach(ds=>{
     if(slots.includes(ds)) return;
     let best=null, bd=99;
     pool.forEach(s=>{ const d=Math.abs((pd(s)-pd(ds))/86400000); if(d<bd || (d===bd && s>best)){ bd=d; best=s; } });
@@ -1431,28 +1447,85 @@ function weekTargets(sunday){
   return { targets:[...new Set([...replaceable,...pool])].sort(), open:pool.size, replacing:replaceable.length };
 }
 
+let replanSunday=null, replanHold=new Set();
 async function replanWeek(sunday){
   if(!state.apiKey){ alert('Add your Anthropic API key in Settings to plan weeks.'); return; }
-  const {targets, replacing}=weekTargets(sunday);
-  if(!targets.length){ alert('Nothing upcoming to plan in that week.'); return; }
-  const msg='Plan '+targets.length+' dinner'+(targets.length>1?'s':'')+' for this week'
-    +(replacing?' — '+replacing+' already planned will be replaced'
-    :'')+'?';
-  if(!confirm(msg)) return;
-  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='planning…'; }
+  const t=todayISO();
+  const upcoming=state.plan.filter(p=>weekKeyOf(p.date)===sunday && p.status!=='cooked' && p.date>=t);
+  if(!upcoming.length){
+    // Nothing to hold on to -- plan the open nights directly
+    const {targets}=weekTargets(sunday, []);
+    if(!targets.length){ alert('Nothing upcoming to plan in that week.'); return; }
+    if(!confirm('Plan '+targets.length+' dinner'+(targets.length>1?'s':'')+' for this week?')) return;
+    const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='planning\u2026'; }
+    try{ await doReplanCall(sunday, [], targets); }
+    catch(e){ alert('Could not plan: '+e.message); }
+    renderPlan();
+    return;
+  }
+  openReplanSheet(sunday);
+}
+function openReplanSheet(sunday){
+  replanSunday=sunday; replanHold=new Set();
+  const t=todayISO();
+  const upcoming=state.plan.filter(p=>weekKeyOf(p.date)===sunday && p.status!=='cooked' && p.date>=t).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('replan-meals').innerHTML=upcoming.map(m=>{
+    const r=getRecipe(m.rid)||{title:'(missing recipe)'};
+    const d=pd(m.date);
+    return `<div class="vrow"><span class="vt"><b>${DOW[d.getDay()]}</b> ${esc(r.title)}</span>
+      <button class="vbtn" id="hold-${m.date}" onclick="toggleHold('${m.date}')">\ud83d\udd13 replace</button></div>`;
+  }).join('');
+  document.getElementById('replan-out').innerHTML='';
+  updateReplanSummary();
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('replan-sheet').classList.add('open');
+}
+function toggleHold(ds){
+  if(replanHold.has(ds)) replanHold.delete(ds); else replanHold.add(ds);
+  const b=document.getElementById('hold-'+ds);
+  if(b){ const held=replanHold.has(ds); b.classList.toggle('on', held); b.textContent=held?'\ud83d\udd12 held':'\ud83d\udd13 replace'; }
+  updateReplanSummary();
+}
+function updateReplanSummary(){
+  const {targets, open}=weekTargets(replanSunday, [...replanHold]);
+  const btn=document.getElementById('replan-send');
+  btn.disabled=!targets.length;
+  btn.textContent= targets.length ? ('Replan '+targets.length+' dinner'+(targets.length>1?'s':'')) : 'Everything is held';
+  document.getElementById('replan-open').textContent = open ? (open+' open night'+(open>1?'s':'')+' will be planned too.') : '';
+}
+async function doReplan(){
+  const hold=[...replanHold];
+  const {targets}=weekTargets(replanSunday, hold);
+  if(!targets.length) return;
+  const btn=document.getElementById('replan-send'); const out=document.getElementById('replan-out');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Planning\u2026'; out.innerHTML='';
   try{
-    const result=await callClaude(
+    const result=await doReplanCall(replanSunday, hold, targets);
+    out.innerHTML=`<div class="chef-reply">\ud83d\udc69\u200d\ud83c\udf73 ${esc(result.reply||'Week replanned.')}</div>`;
+    renderPlan();
+    setTimeout(closeSheets, 2200);
+  }catch(e){
+    out.innerHTML=`<div class="err">Could not replan: ${esc(e.message)}. Try again.</div>`;
+  }finally{
+    btn.disabled=false; updateReplanSummary();
+  }
+}
+async function doReplanCall(sunday, hold, targets){
+  const kept=state.plan.filter(p=>weekKeyOf(p.date)===sunday && hold.includes(p.date))
+    .map(p=>({date:p.date, meal:(getRecipe(p.rid)||{}).title, tag:(getRecipe(p.rid)||{}).tag}));
+  const result=await callClaude(
 `Context: ${JSON.stringify(contextPayload())}
-Plan dinners for ALL of these dates as one cohesive week: ${targets.join(', ')}. Dates that already hold a planned meal are being replaced; design the full set as a single week's shop. Follow every house rule — especially the ingredient-economy limits (~18–22 shopping lines for the whole week) — keep each date's perishability slot sensible, and prefer saved recipes where they fit.
+Plan dinners for these dates to complete the week of ${sunday}: ${targets.join(', ')}. Dates that currently hold a planned meal are being replaced.${kept.length?` The user is KEEPING these meals exactly as planned: ${JSON.stringify(kept)}. Design the new meals AROUND them: share perishables with them so the whole week is one efficient shop, avoid repeating their flavor profiles or cuisines, and count their ingredients toward the weekly shopping-line budget.`:''} Follow every house rule -- especially the ingredient-economy limits (~18\u201322 shopping lines for the WHOLE week including kept meals) -- keep each date's perishability slot sensible, and prefer saved recipes where they fit.
 Return JSON: {"reply": one sentence on the week's direction, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
-    (result.meals||[]).forEach(mm=>{
-      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe); if(!rid) return;
-      const ex=state.plan.find(p=>p.date===mm.date);
-      if(ex){ if(ex.status!=='cooked'){ ex.rid=rid; ex.status='planned'; } }
-      else state.plan.push({date:mm.date, rid, status:'planned'});
-    });
-    save(); renderPlan();
-  }catch(e){ alert('Could not plan: '+e.message); renderPlan(); }
+  (result.meals||[]).forEach(mm=>{
+    if(hold.includes(mm.date)) return; // never overwrite a held meal
+    const rid=resolveChefRecipe(mm.savedTitle, mm.recipe); if(!rid) return;
+    const ex=state.plan.find(p=>p.date===mm.date);
+    if(ex){ if(ex.status!=='cooked'){ ex.rid=rid; ex.status='planned'; } }
+    else state.plan.push({date:mm.date, rid, status:'planned'});
+  });
+  save();
+  return result;
 }
 
 /* ====================== INIT ====================== */
