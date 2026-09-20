@@ -21,7 +21,7 @@ html{font-size:16px}
 body{
   margin:0; background:var(--paper); color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  line-height:1.45; padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  line-height:1.45; padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 96px);
 }
 h1,h2,h3,.display{font-family:"Fraunces",Georgia,serif; font-variation-settings:"SOFT" 80; letter-spacing:-0.01em}
 button{font:inherit; color:inherit; border:0; background:none; cursor:pointer}
@@ -179,6 +179,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 .slotbtn{display:flex; width:100%; align-items:center; justify-content:flex-start; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; font-weight:600; font-size:.92rem}
 .slotbtn:active{background:var(--beet-soft)}
+.slotbtn.on{background:var(--beet-soft); border-color:var(--beet)}
 
 /* Settings */
 .set-block label{display:block; font-weight:600; font-size:.9rem; margin-bottom:6px}
@@ -199,7 +200,8 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
   <section id="scr-plan" class="screen active">
     <p class="section-note">Three weeks out. Tap a meal for the recipe; use <b>Adjust</b> on any meal — or the <b>Chef</b> button — to change direction on the spot.</p>
     <div id="plan-list"></div>
-    <button class="btn ghost full" style="margin:6px 0 14px" onclick="showTab('archive')">🗄️ Past weeks</button>
+    <button class="btn ghost full" style="margin:6px 0 0" onclick="openOneOff()">➕ Plan one dinner</button>
+    <button class="btn ghost full" style="margin:10px 0 14px" onclick="showTab('archive')">🗄️ Past weeks</button>
   </section>
 
   <!-- ARCHIVE -->
@@ -217,7 +219,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 
   <!-- RECIPE BOX -->
   <section id="scr-recipes" class="screen">
-    <p class="section-note">Recipes you've brought home — pasted from anywhere you can copy them, or read from a photo, PDF, or text file. The chef knows this box and reaches for it when planning.</p>
+    <p class="section-note">Only recipes you've chosen to keep live here — the chef reaches for these first when planning. Add them by pasting or photographing a recipe, tapping <b>📖 Keep</b> on a meal you liked, or 👍 in the weekly review. The ✕ removes one for good.</p>
     <button class="btn primary full" onclick="openAddRecipe()">＋ Add a recipe</button>
     <div id="myrec-list"></div>
   </section>
@@ -332,6 +334,19 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
     <button class="btn primary full" id="add-save" onclick="importRecipe()">Save to recipe box</button>
   </div>
   <div id="add-out"></div>
+</div>
+
+<!-- One-off dinner sheet -->
+<div class="sheet" id="oneoff-sheet">
+  <h3>Plan one dinner</h3>
+  <p class="hint">A single meal, no strings attached — tonight or any night. It leans on your pantry, surplus, and saved recipes, with a deliberately tiny shopping list.</p>
+  <div class="gcat">Which night?</div>
+  <div id="oneoff-dates"></div>
+  <textarea id="oneoff-text" placeholder="Optional: what sounds good? e.g. something cozy with the ground beef in the freezer"></textarea>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="btn primary full" id="oneoff-send" onclick="sendOneOff()">Plan it</button>
+  </div>
+  <div id="oneoff-out"></div>
 </div>
 
 <!-- Week review sheet -->
@@ -633,7 +648,7 @@ function renderPlan(){
     const hasUpcoming=meals.some(m=>m.status!=='cooked' && m.date>=t);
     html+=`<div class="week-label"><span>${i===0?'This week':i===1?'Next week':'Week after'}</span><span class="range">${fmtShort(pd(sun))} – ${fmtShort(end)}${hasUpcoming?` <button style="color:var(--beet);font-weight:700;margin-left:6px" onclick="replanWeek('${sun}')">↻ replan</button>`:''}</span></div>`;
     if(!meals.length){
-      html+=`<div class="ticket"><div class="body"><div class="title">Nothing planned yet</div><div class="sub">Ask the chef to fill this week, or it will fill as the horizon rolls forward.</div><div class="tagrow"><button class="btn small primary" onclick="fillWeek('${sun}')">Plan this week</button></div></div></div>`;
+      html+=`<div class="ticket"><div class="body"><div class="title">Nothing planned yet</div><div class="sub">Ask the chef to fill this week, or it will fill as the horizon rolls forward.</div><div class="tagrow"><button class="btn small primary" onclick="replanWeek('${sun}')">Plan this week</button></div></div></div>`;
       return;
     }
     meals.forEach(m=>{
@@ -680,21 +695,19 @@ function recipeRow(id, mine){
     <div class="body">
       <div class="title">${esc(r.title)}</div>
       <div class="sub">${esc(r.desc||'')}</div>
-      <div class="tagrow"><span class="tag ${r.tag}">${r.tag}</span>${mine?'<span class="tag mine">yours</span>':''}</div>
+      <div class="tagrow"><span class="tag ${r.tag}">${r.tag}</span></div>
     </div>
+    ${mine?`<button style="color:var(--beet);font-weight:700;padding:8px 6px" onclick="event.stopPropagation(); deleteRecipe('${id}')">✕</button>`:''}
     <div class="chev">›</div>
   </div>`;
 }
 function renderRecipes(){
   const el=document.getElementById('myrec-list');
   const mine=myRecipeIds();
-  let html=`<div class="week-label"><span>Your recipe box</span></div>`;
+  let html=`<div class="week-label"><span>Your recipe box</span><span class="range">${mine.length?mine.length+' kept':''}</span></div>`;
   html+= mine.length
     ? mine.map(id=>recipeRow(id,true)).join('')
-    : `<p class="section-note">Nothing saved yet. Tap <b>Add a recipe</b> and paste one in — anything you can copy from a site you subscribe to, or a photo of a cookbook page, goes straight into your personal box.</p>`;
-  const chefIds=Object.keys(state.recipes).filter(k=>k.startsWith('ai-'));
-  html+=`<div class="week-label" style="margin-top:22px"><span>The chef's collection</span></div>`;
-  html+= Object.keys(SEED_RECIPES).concat(chefIds).map(id=>recipeRow(id,false)).join('');
+    : `<p class="section-note">Empty — by design. Recipes land here only when you put them here: paste or photograph one with <b>Add a recipe</b>, tap <b>📖 Keep</b> on any meal you liked, or 👍 it in the weekly review.</p>`;
   el.innerHTML=html;
 }
 
@@ -860,6 +873,8 @@ function fmtAmt(a){
 function renderRecipe(){
   const r=getRecipe(currentRecipe.rid); const el=document.getElementById('recipe-body');
   scale = servTarget/(r.serves||2); // older recipes were written for 2; scale them up automatically
+  const meal=currentRecipe.date?state.plan.find(p=>p.date===currentRecipe.date):null;
+  const isCooked=!!(meal && meal.status==='cooked');
   const d=currentRecipe.date?pd(currentRecipe.date):null;
   const mine=currentRecipe.rid.startsWith('my-');
   el.innerHTML=`
@@ -874,7 +889,8 @@ function renderRecipe(){
      ${currentRecipe.date && currentRecipe.date >= todayISO()
        ?`<button class="btn ghost" onclick="openMealFeedback('${currentRecipe.date}')">Adjust</button>`
        :`<button class="btn ghost" onclick="openPlanPicker('${currentRecipe.rid}')">Add to plan</button>`}
-     ${!mine && currentRecipe.date && currentRecipe.date < todayISO()
+     ${meal?`<button class="btn ghost" onclick="toggleCookedFromRecipe()">${isCooked?'✓ Cooked':'Mark cooked'}</button>`:''}
+     ${!mine
        ?`<button class="btn ghost" onclick="keepRecipe('${currentRecipe.rid}')">📖 Keep</button>`:''}
    </div>
    <div class="card">
@@ -895,6 +911,13 @@ function renderRecipe(){
    ${mine?`<button class="back" style="color:#7C2D24" onclick="deleteRecipe('${currentRecipe.rid}')">Remove from recipe box</button>`:''}`;
 }
 
+function toggleCookedFromRecipe(){
+  const m=state.plan.find(p=>p.date===currentRecipe.date);
+  if(!m) return;
+  m.status = m.status==='cooked' ? 'planned' : 'cooked';
+  save(); renderRecipe();
+}
+
 /* ====================== COOKING MODE ====================== */
 let cookStep=0, cookTimer=null, cookLeft=0, wakeLock=null, audioCtx=null;
 function startCook(){
@@ -912,7 +935,16 @@ function cookNav(dir){
   const r=getRecipe(currentRecipe.rid);
   const n=cookStep+dir;
   if(n<0) return;
-  if(n>=r.steps.length){ closeCook(); return; }
+  if(n>=r.steps.length){
+    closeCook();
+    // Finishing the last step means dinner got made — check it off automatically
+    if(currentRecipe.date){
+      const m=state.plan.find(p=>p.date===currentRecipe.date);
+      if(m && m.status!=='cooked'){ m.status='cooked'; save(); }
+      renderRecipe();
+    }
+    return;
+  }
   cookStep=n; stopTimer(); renderCookStep();
 }
 function renderCookStep(){
@@ -1035,6 +1067,60 @@ function addSurplus(){
   state.surplus.push({name:v}); el.value=''; save(); renderIngredients();
 }
 function rmSurplus(i){ state.surplus.splice(i,1); save(); renderIngredients(); }
+
+/* ====================== ONE-OFF DINNER ====================== */
+let oneOffDate=null;
+function openOneOff(){
+  const now=new Date(); oneOffDate=null;
+  let html='';
+  for(let i=0;i<10;i++){
+    const d=new Date(now); d.setDate(d.getDate()+i); const ds=iso(d);
+    const m=state.plan.find(p=>p.date===ds);
+    if(m && m.status==='cooked') continue; // that night already happened
+    if(oneOffDate===null) oneOffDate=ds;
+    const cur=m?getRecipe(m.rid):null;
+    html+=`<button class="slotbtn ${ds===oneOffDate?'on':''}" id="oo-${ds}" onclick="pickOneOff('${ds}')">
+      <span><b>${i===0?'Tonight':DOW[d.getDay()]+' · '+fmtShort(d)}</b>
+      <span class="gfor">${cur?('swaps out: '+esc(cur.title)):'open night'}</span></span></button>`;
+  }
+  document.getElementById('oneoff-dates').innerHTML=html||'<p class="section-note">No available nights found.</p>';
+  document.getElementById('oneoff-text').value='';
+  document.getElementById('oneoff-out').innerHTML='';
+  document.getElementById('sheet-mask').classList.add('open');
+  document.getElementById('oneoff-sheet').classList.add('open');
+}
+function pickOneOff(ds){
+  oneOffDate=ds;
+  document.querySelectorAll('#oneoff-dates .slotbtn').forEach(b=>b.classList.toggle('on', b.id==='oo-'+ds));
+}
+async function sendOneOff(){
+  const out=document.getElementById('oneoff-out');
+  if(!state.apiKey){ out.innerHTML='<div class="err">Add your Anthropic API key in Settings to plan a dinner.</div>'; return; }
+  if(!oneOffDate){ out.innerHTML='<div class="err">Pick a night first.</div>'; return; }
+  const mood=document.getElementById('oneoff-text').value.trim();
+  const ex=state.plan.find(p=>p.date===oneOffDate);
+  const btn=document.getElementById('oneoff-send');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Thinking…'; out.innerHTML='';
+  try{
+    const result=await callClaude(
+`Context: ${JSON.stringify(contextPayload())}
+Plan exactly ONE dinner for ${oneOffDate}${ex?` (it replaces "${(getRecipe(ex.rid)||{}).title}")`:''}. ${mood?`The user's request for it: "${mood}".`:''}
+This is a standalone meal, not part of a weekly shop: it does NOT need to share perishables with other meals. Lean hard on pantry staples, surplus items at home, featured seasonal ingredients, and saved recipes — the shopping list for it should be tiny, ideally 5 items or fewer to buy, possibly zero. All other house rules apply (three servings, flavor doctrine, ingredient economy, the store).
+Return JSON: {"reply": one friendly sentence, "savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}`);
+    const rid=resolveChefRecipe(result.savedTitle, result.recipe);
+    if(!rid) throw new Error('no meal came back');
+    if(ex){ if(ex.status!=='cooked'){ ex.rid=rid; ex.status='planned'; } }
+    else state.plan.push({date:oneOffDate, rid, status:'planned'});
+    save();
+    out.innerHTML=`<div class="chef-reply">👩‍🍳 ${esc(result.reply||'Dinner planned.')}</div>`;
+    renderPlan();
+    setTimeout(closeSheets, 2200);
+  }catch(e){
+    out.innerHTML=`<div class="err">Couldn\u2019t plan it: ${esc(e.message)}. Try again.</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Plan it';
+  }
+}
 
 /* ====================== WEEK REVIEW ====================== */
 let reviewWeek=null, reviewVerdicts={};
@@ -1181,7 +1267,7 @@ function openSheet(title,hint,quick){
 }
 function closeSheets(){
   document.getElementById('sheet-mask').classList.remove('open');
-  ['chef-sheet','add-sheet','plan-sheet','review-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  ['chef-sheet','add-sheet','plan-sheet','review-sheet','oneoff-sheet'].forEach(id=>document.getElementById(id).classList.remove('open'));
 }
 function closeChef(){ closeSheets(); }
 
@@ -1305,41 +1391,40 @@ Return JSON: {"reply": 1-2 friendly sentences, "newPreference": short standing p
 }
 
 async function replanWeek(sunday){
-  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to replan weeks.'); return; }
+  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to plan weeks.'); return; }
   const t=todayISO();
-  const targets=state.plan.filter(p=>weekKeyOf(p.date)===sunday && p.status!=='cooked' && p.date>=t).map(p=>p.date).sort();
-  if(!targets.length){ alert('Nothing upcoming to replan in that week.'); return; }
-  if(!confirm('Replan '+targets.length+' upcoming meal'+(targets.length>1?'s':'')+' in this week from scratch?')) return;
-  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='replanning…'; }
+  const wkMeals=state.plan.filter(p=>weekKeyOf(p.date)===sunday);
+  const replaceable=wkMeals.filter(p=>p.status!=='cooked' && p.date>=t).map(p=>p.date);
+  const slots=[0,2,4,6].map(off=>{ const d=new Date(pd(sunday)); d.setDate(d.getDate()+off); return iso(d); });
+  const pool=new Set(slots.filter(ds=> ds>=t && !wkMeals.some(p=>p.date===ds)));
+  // An existing meal on an off-schedule night absorbs its nearest standard slot,
+  // so the week still totals four dinners.
+  replaceable.forEach(ds=>{
+    if(slots.includes(ds)) return;
+    let best=null, bd=99;
+    pool.forEach(s=>{ const d=Math.abs((pd(s)-pd(ds))/86400000); if(d<bd || (d===bd && s>best)){ bd=d; best=s; } });
+    if(best!==null && bd<=2) pool.delete(best);
+  });
+  const targets=[...new Set([...replaceable,...pool])].sort();
+  if(!targets.length){ alert('Nothing upcoming to plan in that week.'); return; }
+  const msg='Plan '+targets.length+' dinner'+(targets.length>1?'s':'')+' for this week'
+    +(replaceable.length?' — '+replaceable.length+' already planned will be replaced'
+    :'')+'?';
+  if(!confirm(msg)) return;
+  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='planning…'; }
   try{
     const result=await callClaude(
 `Context: ${JSON.stringify(contextPayload())}
-Replan these upcoming dates from scratch, replacing what is currently planned on them: ${targets.join(', ')}. Design a fresh, cohesive set for that week that follows every house rule — especially the ingredient-economy limits (at most ~10 ingredients per dish, ~18–22 shopping lines for the week). Share perishables across the new meals and any already-cooked ones that week; keep each date's perishability slot sensible; prefer saved recipes where they fit.
-Return JSON: {"reply": one sentence on the new direction, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
+Plan dinners for ALL of these dates as one cohesive week: ${targets.join(', ')}. Dates that already hold a planned meal are being replaced; design the full set as a single week's shop. Follow every house rule — especially the ingredient-economy limits (~18–22 shopping lines for the whole week) — keep each date's perishability slot sensible, and prefer saved recipes where they fit.
+Return JSON: {"reply": one sentence on the week's direction, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
     (result.meals||[]).forEach(mm=>{
-      const m=state.plan.find(p=>p.date===mm.date);
-      if(!m || m.status==='cooked') return;
-      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe);
-      if(rid){ m.rid=rid; m.status='planned'; }
+      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe); if(!rid) return;
+      const ex=state.plan.find(p=>p.date===mm.date);
+      if(ex){ if(ex.status!=='cooked'){ ex.rid=rid; ex.status='planned'; } }
+      else state.plan.push({date:mm.date, rid, status:'planned'});
     });
     save(); renderPlan();
-  }catch(e){ alert('Could not replan: '+e.message); renderPlan(); }
-}
-
-async function fillWeek(sunday){
-  if(!state.apiKey){ alert('Add your Anthropic API key in Settings to generate new weeks.'); return; }
-  const wk=document.activeElement; if(wk){ wk.disabled=true; wk.textContent='Planning…'; }
-  try{
-    const result=await callClaude(
-`Context: ${JSON.stringify(contextPayload())}
-Plan the week starting Sunday ${sunday}: four dinners on that Sunday (fish), Tuesday (chicken), Thursday (vegetarian), Saturday (beef or pork, frozen:true). Share perishables across the meals; lean on featured seasonal ingredients, surplus items, and saved recipes from the box when they fit the slots.
-Return JSON: {"reply": one sentence, "meals":[{"date":"YYYY-MM-DD","savedTitle": exact saved title or null, "recipe": ${RECIPE_SCHEMA} or null if savedTitle is used}]}`);
-    (result.meals||[]).forEach(mm=>{
-      const rid=resolveChefRecipe(mm.savedTitle, mm.recipe);
-      if(rid) state.plan.push({date:mm.date, rid, status:'planned'});
-    });
-    save(); renderPlan();
-  }catch(e){ alert('Could not plan the week: '+e.message); }
+  }catch(e){ alert('Could not plan: '+e.message); renderPlan(); }
 }
 
 /* ====================== INIT ====================== */
