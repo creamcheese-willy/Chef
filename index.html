@@ -409,7 +409,7 @@ nav.tabs button.active{color:var(--beet); font-weight:600}
 
 <script>
 /* ====================== VERSION ====================== */
-const APP_VERSION=15; // bumped with every release; the update checker compares this against GitHub
+const APP_VERSION=18; // bumped with every release; the update checker compares this against GitHub
 
 /* ====================== DATA LAYER ====================== */
 const LS_KEY = 'dinner-app-v1';
@@ -737,7 +737,20 @@ function renderRecipes(){
   html+= mine.length
     ? mine.map(id=>recipeRow(id,true)).join('')
     : `<p class="section-note">Empty — by design. Recipes land here only when you put them here: paste or photograph one with <b>Add a recipe</b>, tap <b>📖 Keep</b> on any meal you liked, or 👍 it in the weekly review.</p>`;
+  const orphans=orphanRecipeIds();
+  if(orphans.length){
+    html+=`<div class="week-label" style="margin-top:22px"><span>Replaced by the chef</span><span class="range">${orphans.length}</span></div>
+    <p class="section-note">Dishes that were swapped off the plan but never deleted. Open one to <b>📖 Keep</b> it or put it back on a night.</p>`;
+    html+=orphans.map(id=>recipeRow(id,false)).join('');
+  }
   el.innerHTML=html;
+}
+/* Chef-created recipes no plan entry points at anymore — replaced, not deleted. Newest first. */
+function orphanRecipeIds(){
+  return Object.keys(state.recipes)
+    .filter(k=>k.startsWith('ai-') && !state.plan.some(p=>p.rid===k))
+    .sort((a,b)=>b.localeCompare(a))
+    .slice(0,20);
 }
 
 let pendingFile=null;
